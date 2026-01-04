@@ -12,5 +12,5 @@ export async function openRagPanel(plugin: ObsidianRagPlugin) {
     }
     await leaf.setViewState({ type: RAG_VIEW_TYPE, active: true });
   }
-  workspace.revealLeaf(leaf);
+  await workspace.revealLeaf(leaf);
 }
