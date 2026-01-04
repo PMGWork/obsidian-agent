@@ -1,4 +1,4 @@
-import { ItemView, Notice, WorkspaceLeaf } from "obsidian";
+import { ItemView, Notice, WorkspaceLeaf, TFile } from "obsidian";
 import ObsidianRagPlugin from "../main";
 import { GeminiClient } from "../services/gemini";
 import { indexVaultCommand } from "../commands/index_vault";
@@ -9,6 +9,9 @@ export const RAG_VIEW_TYPE = "gemini-file-search-rag-view";
 type SourceItem = {
   label: string;
   detail?: string;
+  path?: string;
+  uri?: string;
+  index: number;
 };
 
 export class RagView extends ItemView {
@@ -17,6 +20,7 @@ export class RagView extends ItemView {
   private statusEl?: HTMLElement;
   private answerEl?: HTMLElement;
   private sourcesEl?: HTMLElement;
+  private hintEl?: HTMLElement;
 
   constructor(leaf: WorkspaceLeaf, plugin: ObsidianRagPlugin) {
     super(leaf);
@@ -36,6 +40,11 @@ export class RagView extends ItemView {
     this.cleanupStatus = this.plugin.onStatusChange((message) => {
       if (this.statusEl) {
         this.statusEl.setText(message);
+        if (message) {
+          this.statusEl.addClass("is-active");
+        } else {
+          this.statusEl.removeClass("is-active");
+        }
       }
     });
   }
@@ -52,26 +61,40 @@ export class RagView extends ItemView {
     contentEl.addClass("gemini-rag-view");
 
     const header = contentEl.createEl("div", { cls: "gemini-rag-header" });
-    header.createEl("h2", { text: "Gemini RAG" });
-    this.statusEl = header.createEl("div", { cls: "gemini-rag-status" });
+    const titleWrap = header.createEl("div", { cls: "gemini-rag-title-wrap" });
+    titleWrap.createEl("div", { cls: "gemini-rag-kicker", text: "Knowledge panel" });
+    titleWrap.createEl("h2", { text: "Gemini RAG" });
+    this.statusEl = header.createEl("div", { cls: "gemini-rag-status-pill" });
 
     const controls = contentEl.createEl("div", { cls: "gemini-rag-controls" });
+    const inputLabel = controls.createEl("div", { cls: "gemini-rag-label" });
+    inputLabel.setText("Ask about your notes");
     const input = controls.createEl("textarea", {
       cls: "gemini-rag-input",
-      attr: { rows: "4", placeholder: "Ask something about your notes..." },
+      attr: { rows: "5", placeholder: "例: この週の進捗まとめと課題は？" },
     });
+    this.hintEl = controls.createEl("div", { cls: "gemini-rag-hint" });
+    this.hintEl.setText("⌘/Ctrl + Enter で送信");
 
     const buttons = controls.createEl("div", { cls: "gemini-rag-buttons" });
-    const askButton = buttons.createEl("button", { text: "Ask" });
-    const indexButton = buttons.createEl("button", { text: "Index vault" });
-    const storeButton = buttons.createEl("button", { text: "Create store" });
+    const askButton = buttons.createEl("button", { cls: "gemini-rag-btn primary", text: "Ask" });
+    const indexButton = buttons.createEl("button", { cls: "gemini-rag-btn", text: "Index vault" });
+    const storeButton = buttons.createEl("button", { cls: "gemini-rag-btn ghost", text: "Create store" });
 
-    askButton.addEventListener("click", async () => {
+    const triggerAsk = async () => {
       const question = input.value.trim();
       if (!question) {
         return;
       }
       await this.ask(question);
+    };
+
+    askButton.addEventListener("click", triggerAsk);
+    input.addEventListener("keydown", async (event) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+        event.preventDefault();
+        await triggerAsk();
+      }
     });
 
     indexButton.addEventListener("click", async () => {
@@ -82,8 +105,13 @@ export class RagView extends ItemView {
       await createStoreCommand(this.plugin);
     });
 
-    this.answerEl = contentEl.createEl("div", { cls: "gemini-rag-answer" });
-    this.sourcesEl = contentEl.createEl("div", { cls: "gemini-rag-sources" });
+    const answerSection = contentEl.createEl("div", { cls: "gemini-rag-section" });
+    answerSection.createEl("h3", { text: "Answer" });
+    this.answerEl = answerSection.createEl("div", { cls: "gemini-rag-answer" });
+
+    const sourcesSection = contentEl.createEl("div", { cls: "gemini-rag-section" });
+    sourcesSection.createEl("h3", { text: "Sources" });
+    this.sourcesEl = sourcesSection.createEl("div", { cls: "gemini-rag-sources" });
   }
 
   private async ask(question: string) {
@@ -102,26 +130,36 @@ export class RagView extends ItemView {
     const client = new GeminiClient(apiKey);
     try {
       this.plugin.setStatus("Generating answer...");
+      if (this.statusEl) {
+        this.statusEl.setText("Thinking...");
+        this.statusEl.addClass("is-active");
+      }
       if (this.answerEl) this.answerEl.setText("");
       if (this.sourcesEl) this.sourcesEl.setText("");
 
       const response = await client.generateContent(model, storeName, question);
       const { text, grounding } = client.extractAnswer(response);
+      const sources = this.extractSources(grounding);
+      const annotatedText = this.annotateAnswer(text, grounding, sources);
       if (this.answerEl) {
-        this.answerEl.createEl("h3", { text: "Answer" });
-        this.answerEl.createEl("div", { text });
+        this.answerEl.createEl("div", { text: annotatedText });
       }
 
-      const sources = this.extractSources(grounding);
       if (this.sourcesEl) {
-        this.sourcesEl.createEl("h3", { text: "Sources" });
         if (sources.length === 0) {
           this.sourcesEl.createEl("div", { text: "No sources returned." });
         } else {
           const list = this.sourcesEl.createEl("ol");
           for (const source of sources) {
             const item = list.createEl("li");
-            item.createEl("div", { text: source.label });
+            const link = item.createEl("a", {
+              text: `[${source.index}] ${source.label}`,
+              cls: "gemini-rag-source-link",
+            });
+            link.addEventListener("click", (event) => {
+              event.preventDefault();
+              this.openSource(source);
+            });
             if (source.detail) {
               item.createEl("div", { text: source.detail, cls: "gemini-rag-source-detail" });
             }
@@ -133,6 +171,10 @@ export class RagView extends ItemView {
       new Notice("Failed to generate answer. Check console for details.");
     } finally {
       this.plugin.setStatus("");
+      if (this.statusEl) {
+        this.statusEl.setText("");
+        this.statusEl.removeClass("is-active");
+      }
     }
   }
 
@@ -147,7 +189,87 @@ export class RagView extends ItemView {
       const text = (context?.text ?? context?.["text"]) as string | undefined;
       const label = title || uri || `Chunk ${index + 1}`;
       const detail = text ? text.slice(0, 200) : undefined;
-      return { label, detail };
+      const path = this.resolveVaultPath(title);
+      return { label, detail, path, uri, index: index + 1 };
     });
+  }
+
+  private annotateAnswer(
+    text: string,
+    grounding: { groundingSupports?: Array<Record<string, unknown>>; grounding_supports?: Array<Record<string, unknown>> } | undefined,
+    sources: SourceItem[]
+  ): string {
+    if (!grounding) {
+      return text;
+    }
+    const supports =
+      (grounding.groundingSupports ??
+        (grounding as { grounding_supports?: Array<Record<string, unknown>> }).grounding_supports) ??
+      [];
+    if (supports.length === 0) {
+      return text;
+    }
+
+    const insertions: Array<{ pos: number; marker: string }> = [];
+    for (const support of supports) {
+      const segment = (support.segment ?? support["segment"]) as Record<string, unknown> | undefined;
+      const endIndex = segment?.endIndex ?? segment?.["end_index"];
+      const chunkIndices = (support.groundingChunkIndices ??
+        support["grounding_chunk_indices"]) as number[] | undefined;
+      if (typeof endIndex !== "number" || !Array.isArray(chunkIndices)) {
+        continue;
+      }
+      const numbers = chunkIndices
+        .map((idx) => sources[idx]?.index)
+        .filter((value): value is number => typeof value === "number");
+      if (numbers.length === 0) {
+        continue;
+      }
+      const unique = Array.from(new Set(numbers)).sort((a, b) => a - b);
+      insertions.push({ pos: endIndex, marker: ` [${unique.join(", ")}]` });
+    }
+
+    if (insertions.length === 0) {
+      return text;
+    }
+
+    insertions.sort((a, b) => b.pos - a.pos);
+    let output = text;
+    for (const insertion of insertions) {
+      if (insertion.pos >= 0 && insertion.pos <= output.length) {
+        output = output.slice(0, insertion.pos) + insertion.marker + output.slice(insertion.pos);
+      } else {
+        output += insertion.marker;
+      }
+    }
+    return output;
+  }
+
+  private resolveVaultPath(title?: string): string | undefined {
+    if (!title) {
+      return undefined;
+    }
+    const file = this.app.vault.getAbstractFileByPath(title);
+    if (file) {
+      return title;
+    }
+    return undefined;
+  }
+
+  private async openSource(source: SourceItem) {
+    if (source.path) {
+      const file = this.app.vault.getAbstractFileByPath(source.path);
+      if (file instanceof TFile) {
+        await this.app.workspace.getLeaf(true).openFile(file);
+        return;
+      }
+    }
+    if (source.uri) {
+      if (source.uri.startsWith("obsidian://")) {
+        window.open(source.uri, "_blank");
+        return;
+      }
+      window.open(source.uri, "_blank");
+    }
   }
 }

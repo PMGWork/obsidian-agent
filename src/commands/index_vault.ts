@@ -70,7 +70,7 @@ async function indexFile(
     throw new Error(`File too large: ${file.path}`);
   }
   const operation = await client.uploadMarkdownToStore(storeName, {
-    displayName: file.name,
+    displayName: file.path,
     bytes,
   });
   if (operation?.name) {
