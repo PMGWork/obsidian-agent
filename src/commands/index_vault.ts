@@ -6,6 +6,7 @@ type IndexProgress = {
   total: number;
   indexed: number;
   skipped: number;
+  uploaded: number;
 };
 
 function getMtime(file: TFile): number {
@@ -30,32 +31,62 @@ export async function indexVaultCommand(plugin: ObsidianRagPlugin) {
     total: files.length,
     indexed: 0,
     skipped: 0,
+    uploaded: 0,
   };
 
   plugin.setStatus(`Indexing ${files.length} files...`);
 
-  for (const file of files) {
-    const mtime = getMtime(file);
-    const lastIndexed = plugin.indexState.files[file.path]?.mtime ?? 0;
-    if (mtime <= lastIndexed) {
-      progress.skipped += 1;
-      continue;
-    }
+  const targets = files
+    .map((file) => ({ file, mtime: getMtime(file) }))
+    .filter(({ file, mtime }) => {
+      const lastIndexed = plugin.indexState.files[file.path]?.mtime ?? 0;
+      if (mtime <= lastIndexed) {
+        progress.skipped += 1;
+        return false;
+      }
+      return true;
+    });
 
+  const concurrency = 4;
+  const results = await runWithConcurrency(concurrency, targets, async ({ file, mtime }) => {
     try {
-      await indexFile(plugin, client, storeName, file, mtime);
-      plugin.indexState.files[file.path] = { mtime };
+      const operation = await indexFile(plugin, client, storeName, file, mtime);
+      progress.uploaded += 1;
+      plugin.setStatus(
+        `Uploaded ${progress.uploaded}/${progress.total} (skipped ${progress.skipped})`
+      );
+      return { file, mtime, operationName: operation?.name, ok: true };
+    } catch (error) {
+      console.error(error);
+      new Notice(`Failed to upload ${file.path}`);
+      return { file, mtime, operationName: undefined, ok: false };
+    }
+  });
+
+  const operations = results.filter((result) => result.operationName && result.ok);
+  if (operations.length > 0) {
+    plugin.setStatus(`Finalizing ${operations.length} uploads...`);
+  }
+
+  for (const entry of operations) {
+    if (!entry.operationName) continue;
+    try {
+      await client.waitForOperation(entry.operationName);
+      plugin.indexState.files[entry.file.path] = { mtime: entry.mtime };
       progress.indexed += 1;
-      plugin.setStatus(`Indexed ${progress.indexed}/${progress.total} (skipped ${progress.skipped})`);
       await plugin.saveSettings();
     } catch (error) {
       console.error(error);
-      new Notice(`Failed to index ${file.path}`);
+      new Notice(`Failed to finalize ${entry.file.path}`);
     }
   }
 
-  plugin.setStatus(`Index complete. Indexed ${progress.indexed}, skipped ${progress.skipped}.`);
-  new Notice(`Index complete. Indexed ${progress.indexed}, skipped ${progress.skipped}.`);
+  plugin.setStatus(
+    `Index complete. Indexed ${progress.indexed}, uploaded ${progress.uploaded}, skipped ${progress.skipped}.`
+  );
+  new Notice(
+    `Index complete. Indexed ${progress.indexed}, uploaded ${progress.uploaded}, skipped ${progress.skipped}.`
+  );
 }
 
 async function indexFile(
@@ -89,7 +120,27 @@ async function indexFile(
     chunking,
     metadata,
   });
-  if (operation?.name) {
-    await client.waitForOperation(operation.name);
-  }
+  return operation;
+}
+
+async function runWithConcurrency<T, R>(
+  limit: number,
+  items: T[],
+  worker: (item: T) => Promise<R>
+): Promise<R[]> {
+  const results: R[] = [];
+  let index = 0;
+
+  const runWorker = async () => {
+    while (index < items.length) {
+      const currentIndex = index;
+      index += 1;
+      const item = items[currentIndex] as T;
+      results[currentIndex] = await worker(item);
+    }
+  };
+
+  const runners = Array.from({ length: Math.min(limit, items.length) }, () => runWorker());
+  await Promise.all(runners);
+  return results;
 }

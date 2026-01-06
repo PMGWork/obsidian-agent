@@ -2,16 +2,19 @@ import { Plugin } from "obsidian";
 import { DEFAULT_SETTINGS, RagSettingTab, RagSettings } from "./settings";
 import { RagView, RAG_VIEW_TYPE } from "./ui/rag_view";
 import { registerCommands } from "./commands";
-import { IndexState, DEFAULT_INDEX_STATE } from "./types";
+import { openRagPanel } from "./commands/open_panel";
+import { IndexState, DEFAULT_INDEX_STATE, ChatEntry } from "./types";
 
 type PersistedData = {
   settings?: Partial<RagSettings>;
   indexState?: IndexState;
+  history?: ChatEntry[];
 };
 
 export default class ObsidianRagPlugin extends Plugin {
   settings: RagSettings;
   indexState: IndexState;
+  history: ChatEntry[];
   private statusListeners = new Set<(message: string) => void>();
 
   async onload() {
@@ -20,6 +23,10 @@ export default class ObsidianRagPlugin extends Plugin {
     this.registerView(RAG_VIEW_TYPE, (leaf) => new RagView(leaf, this));
     this.addSettingTab(new RagSettingTab(this.app, this));
     registerCommands(this);
+
+    this.app.workspace.onLayoutReady(() => {
+      void openRagPanel(this);
+    });
   }
 
   onunload() {
@@ -45,10 +52,12 @@ export default class ObsidianRagPlugin extends Plugin {
       const persisted = raw as PersistedData;
       this.settings = Object.assign({}, DEFAULT_SETTINGS, persisted.settings ?? {});
       this.indexState = Object.assign({}, DEFAULT_INDEX_STATE, persisted.indexState ?? {});
+      this.history = Array.isArray(persisted.history) ? persisted.history : [];
     } else {
       const legacy = (raw ?? {}) as Partial<RagSettings>;
       this.settings = Object.assign({}, DEFAULT_SETTINGS, legacy);
       this.indexState = Object.assign({}, DEFAULT_INDEX_STATE);
+      this.history = [];
     }
   }
 
@@ -56,6 +65,7 @@ export default class ObsidianRagPlugin extends Plugin {
     const data: PersistedData = {
       settings: this.settings,
       indexState: this.indexState,
+      history: this.history,
     };
     await this.saveData(data);
   }

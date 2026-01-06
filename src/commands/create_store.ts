@@ -12,6 +12,10 @@ export async function createStoreCommand(plugin: ObsidianRagPlugin) {
   const displayName = plugin.settings.storeDisplayName || "obsidian-vault";
   const client = new GeminiClient(apiKey);
   try {
+    if (plugin.settings.storeName) {
+      plugin.setStatus("Deleting existing File Search store...");
+      await client.deleteFileSearchStore(plugin.settings.storeName, true);
+    }
     plugin.setStatus("Creating File Search store...");
     const store = await client.createFileSearchStore(displayName);
     plugin.settings.storeName = store.name ?? "";

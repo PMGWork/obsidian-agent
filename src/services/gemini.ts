@@ -41,6 +41,14 @@ export class GeminiClient {
     return response as FileSearchStore;
   }
 
+  async deleteFileSearchStore(name: string, force = true): Promise<void> {
+    const url = new URL(`${BASE_URL}/${name}`);
+    if (force) {
+      url.searchParams.set("force", "true");
+    }
+    await this.request(url.toString(), { method: "DELETE" });
+  }
+
   async uploadMarkdownToStore(
     storeName: string,
     payload: {

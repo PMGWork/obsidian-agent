@@ -23,6 +23,7 @@ export class RagView extends ItemView {
   private answerBodyEl?: HTMLElement;
   private sourcesEl?: HTMLElement;
   private hintEl?: HTMLElement;
+  private historyEl?: HTMLElement;
   private sourcesMap = new Map<number, SourceItem>();
 
   constructor(leaf: WorkspaceLeaf, plugin: ObsidianRagPlugin) {
@@ -131,6 +132,11 @@ export class RagView extends ItemView {
     const sourcesSection = contentEl.createEl("div", { cls: "gemini-rag-section" });
     sourcesSection.createEl("h3", { text: "Sources" });
     this.sourcesEl = sourcesSection.createEl("div", { cls: "gemini-rag-sources" });
+
+    const historySection = contentEl.createEl("div", { cls: "gemini-rag-section" });
+    historySection.createEl("h3", { text: "History" });
+    this.historyEl = historySection.createEl("div", { cls: "gemini-rag-history" });
+    this.renderHistory();
   }
 
   private async ask(question: string) {
@@ -179,6 +185,9 @@ export class RagView extends ItemView {
         );
       }
 
+      this.pushHistory(question, annotatedText);
+      this.renderHistory();
+
       if (this.sourcesEl) {
         if (sources.length === 0) {
           this.sourcesEl.createEl("div", { text: "No sources returned." });
@@ -194,9 +203,6 @@ export class RagView extends ItemView {
               event.preventDefault();
               void this.openSource(source, true);
             });
-            if (source.detail) {
-              item.createEl("div", { text: source.detail, cls: "gemini-rag-source-detail" });
-            }
           }
         }
       }
@@ -209,6 +215,42 @@ export class RagView extends ItemView {
         this.statusEl.setText("");
         this.statusEl.removeClass("is-active");
       }
+    }
+  }
+
+  private pushHistory(question: string, answer: string) {
+    const entry = {
+      id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      timestamp: Date.now(),
+      question,
+      answer,
+    };
+    const maxItems = 30;
+    this.plugin.history.unshift(entry);
+    if (this.plugin.history.length > maxItems) {
+      this.plugin.history = this.plugin.history.slice(0, maxItems);
+    }
+    void this.plugin.saveSettings();
+  }
+
+  private renderHistory() {
+    if (!this.historyEl) return;
+    this.historyEl.empty();
+    if (!this.plugin.history.length) {
+      this.historyEl.createEl("div", { text: "No history yet." });
+      return;
+    }
+
+    for (const entry of this.plugin.history) {
+      const item = this.historyEl.createEl("div", { cls: "gemini-rag-history-item" });
+      item.createEl("div", { cls: "gemini-rag-history-question", text: entry.question });
+      const answerEl = item.createEl("div", { cls: "gemini-rag-history-answer" });
+      void MarkdownRenderer.renderMarkdown(
+        entry.answer,
+        answerEl,
+        this.plugin.app.vault.getRoot().path,
+        this
+      );
     }
   }
 

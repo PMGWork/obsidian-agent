@@ -119,6 +119,28 @@ If your plugin does not need CSS, delete this file.
   line-height: 1.6;
 }
 
+.gemini-rag-history {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.gemini-rag-history-item {
+  padding: 8px 10px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  background: var(--background-secondary);
+}
+
+.gemini-rag-history-question {
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.gemini-rag-history-answer {
+  font-size: 12px;
+}
+
 .gemini-rag-answer-body :is(h1, h2, h3, h4, h5, h6) {
   margin: 0.8em 0 0.4em;
 }
@@ -132,11 +154,6 @@ If your plugin does not need CSS, delete this file.
 .gemini-rag-sources ol {
   margin: 0;
   padding-left: 20px;
-}
-
-.gemini-rag-source-detail {
-  font-size: 11px;
-  opacity: 0.75;
 }
 
 .gemini-rag-source-link {

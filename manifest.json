@@ -1,7 +1,7 @@
 {
 	"id": "obsidian-agent",
 	"name": "Gemini RAG",
-	"version": "0.1.1",
+	"version": "0.1.2",
 	"minAppVersion": "0.15.0",
 	"description": "RAG over your vault using Gemini File Search.",
 	"author": "yuto",
