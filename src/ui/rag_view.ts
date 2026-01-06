@@ -1,4 +1,4 @@
-import { ItemView, Notice, WorkspaceLeaf, TFile } from "obsidian";
+import { ItemView, Notice, WorkspaceLeaf, TFile, MarkdownRenderer, MarkdownView, Editor } from "obsidian";
 import ObsidianRagPlugin from "../main";
 import { GeminiClient } from "../services/gemini";
 import { indexVaultCommand } from "../commands/index_vault";
@@ -12,6 +12,7 @@ type SourceItem = {
   path?: string;
   uri?: string;
   index: number;
+  text?: string;
 };
 
 export class RagView extends ItemView {
@@ -19,8 +20,10 @@ export class RagView extends ItemView {
   private cleanupStatus?: () => void;
   private statusEl?: HTMLElement;
   private answerEl?: HTMLElement;
+  private answerBodyEl?: HTMLElement;
   private sourcesEl?: HTMLElement;
   private hintEl?: HTMLElement;
+  private sourcesMap = new Map<number, SourceItem>();
 
   constructor(leaf: WorkspaceLeaf, plugin: ObsidianRagPlugin) {
     super(leaf);
@@ -62,7 +65,6 @@ export class RagView extends ItemView {
 
     const header = contentEl.createEl("div", { cls: "gemini-rag-header" });
     const titleWrap = header.createEl("div", { cls: "gemini-rag-title-wrap" });
-    titleWrap.createEl("div", { cls: "gemini-rag-kicker", text: "Knowledge panel" });
     titleWrap.createEl("h2", { text: "Gemini RAG" });
     this.statusEl = header.createEl("div", { cls: "gemini-rag-status-pill" });
 
@@ -71,15 +73,15 @@ export class RagView extends ItemView {
     inputLabel.setText("Ask about your notes");
     const input = controls.createEl("textarea", {
       cls: "gemini-rag-input",
-      attr: { rows: "5", placeholder: "例: この週の進捗まとめと課題は？" },
+      attr: { rows: "5", placeholder: "Ask something about your notes..." },
     });
     this.hintEl = controls.createEl("div", { cls: "gemini-rag-hint" });
     this.hintEl.setText("⌘/Ctrl + Enter で送信");
 
     const buttons = controls.createEl("div", { cls: "gemini-rag-buttons" });
-    const askButton = buttons.createEl("button", { cls: "gemini-rag-btn primary", text: "Ask" });
+    const askButton = buttons.createEl("button", { cls: "gemini-rag-btn is-primary", text: "Ask" });
     const indexButton = buttons.createEl("button", { cls: "gemini-rag-btn", text: "Index vault" });
-    const storeButton = buttons.createEl("button", { cls: "gemini-rag-btn ghost", text: "Create store" });
+    const storeButton = buttons.createEl("button", { cls: "gemini-rag-btn", text: "Create store" });
 
     const triggerAsk = async () => {
       const question = input.value.trim();
@@ -108,6 +110,23 @@ export class RagView extends ItemView {
     const answerSection = contentEl.createEl("div", { cls: "gemini-rag-section" });
     answerSection.createEl("h3", { text: "Answer" });
     this.answerEl = answerSection.createEl("div", { cls: "gemini-rag-answer" });
+    this.answerBodyEl = this.answerEl.createEl("div", { cls: "gemini-rag-answer-body" });
+    this.answerBodyEl.addEventListener("click", (event) => {
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+      const link = target.closest("a");
+      if (!link) return;
+      const href = link.getAttribute("href");
+      if (!href || !href.startsWith("citation:")) return;
+      event.preventDefault();
+      const indexText = href.replace("citation:", "");
+      const index = Number(indexText);
+      if (!Number.isFinite(index)) return;
+      const source = this.sourcesMap.get(index);
+      if (source) {
+        void this.openSource(source, true);
+      }
+    });
 
     const sourcesSection = contentEl.createEl("div", { cls: "gemini-rag-section" });
     sourcesSection.createEl("h3", { text: "Sources" });
@@ -134,15 +153,30 @@ export class RagView extends ItemView {
         this.statusEl.setText("Thinking...");
         this.statusEl.addClass("is-active");
       }
-      if (this.answerEl) this.answerEl.setText("");
+      if (this.answerBodyEl) this.answerBodyEl.setText("");
       if (this.sourcesEl) this.sourcesEl.setText("");
 
-      const response = await client.generateContent(model, storeName, question);
+      const response = await client.generateContent(
+        model,
+        storeName,
+        question,
+        this.plugin.settings.metadataFilter || undefined
+      );
       const { text, grounding } = client.extractAnswer(response);
       const sources = this.extractSources(grounding);
+      this.sourcesMap.clear();
+      for (const source of sources) {
+        this.sourcesMap.set(source.index, source);
+      }
       const annotatedText = this.annotateAnswer(text, grounding, sources);
-      if (this.answerEl) {
-        this.answerEl.createEl("div", { text: annotatedText });
+      if (this.answerBodyEl) {
+        this.answerBodyEl.empty();
+        await MarkdownRenderer.renderMarkdown(
+          annotatedText,
+          this.answerBodyEl,
+          this.plugin.app.vault.getRoot().path,
+          this
+        );
       }
 
       if (this.sourcesEl) {
@@ -158,7 +192,7 @@ export class RagView extends ItemView {
             });
             link.addEventListener("click", (event) => {
               event.preventDefault();
-              this.openSource(source);
+              void this.openSource(source, true);
             });
             if (source.detail) {
               item.createEl("div", { text: source.detail, cls: "gemini-rag-source-detail" });
@@ -190,7 +224,7 @@ export class RagView extends ItemView {
       const label = title || uri || `Chunk ${index + 1}`;
       const detail = text ? text.slice(0, 200) : undefined;
       const path = this.resolveVaultPath(title);
-      return { label, detail, path, uri, index: index + 1 };
+      return { label, detail, path, uri, index: index + 1, text };
     });
   }
 
@@ -210,7 +244,7 @@ export class RagView extends ItemView {
       return text;
     }
 
-    const insertions: Array<{ pos: number; marker: string }> = [];
+    const positionMap = new Map<number, number[]>();
     for (const support of supports) {
       const segment = (support.segment ?? support["segment"]) as Record<string, unknown> | undefined;
       const endIndex = segment?.endIndex ?? segment?.["end_index"];
@@ -226,11 +260,20 @@ export class RagView extends ItemView {
         continue;
       }
       const unique = Array.from(new Set(numbers)).sort((a, b) => a - b);
-      insertions.push({ pos: endIndex, marker: ` [${unique.join(", ")}]` });
+      const sentenceEnd = this.findSentenceEnd(text, endIndex);
+      const existing = positionMap.get(sentenceEnd) ?? [];
+      positionMap.set(sentenceEnd, existing.concat(unique));
     }
 
-    if (insertions.length === 0) {
+    if (positionMap.size === 0) {
       return text;
+    }
+
+    const insertions: Array<{ pos: number; marker: string }> = [];
+    for (const [pos, numbers] of positionMap.entries()) {
+      const unique = Array.from(new Set(numbers)).sort((a, b) => a - b);
+      const marker = unique.map((value) => `[${value}](citation:${value})`).join(" ");
+      insertions.push({ pos, marker: ` ${marker}` });
     }
 
     insertions.sort((a, b) => b.pos - a.pos);
@@ -245,6 +288,20 @@ export class RagView extends ItemView {
     return output;
   }
 
+  private findSentenceEnd(text: string, startIndex: number): number {
+    if (startIndex >= text.length) {
+      return text.length;
+    }
+    const endChars = [".", "!", "?", "。", "！", "？", "\n"];
+    for (let i = Math.max(0, startIndex); i < text.length; i += 1) {
+      const char = text.charAt(i);
+      if (endChars.includes(char)) {
+        return i + 1;
+      }
+    }
+    return text.length;
+  }
+
   private resolveVaultPath(title?: string): string | undefined {
     if (!title) {
       return undefined;
@@ -256,11 +313,18 @@ export class RagView extends ItemView {
     return undefined;
   }
 
-  private async openSource(source: SourceItem) {
+  private async openSource(source: SourceItem, highlight: boolean) {
     if (source.path) {
       const file = this.app.vault.getAbstractFileByPath(source.path);
       if (file instanceof TFile) {
-        await this.app.workspace.getLeaf(true).openFile(file);
+        const leaf = this.app.workspace.getLeaf(true);
+        await leaf.openFile(file);
+        if (highlight && source.text) {
+          const view = leaf.view;
+          if (view instanceof MarkdownView && view.editor) {
+            await this.highlightSnippet(view.editor, source.text);
+          }
+        }
         return;
       }
     }
@@ -271,5 +335,17 @@ export class RagView extends ItemView {
       }
       window.open(source.uri, "_blank");
     }
+  }
+
+  private async highlightSnippet(editor: Editor, snippet: string) {
+    const content = editor.getValue();
+    const normalized = snippet.trim();
+    if (!normalized) return;
+    const index = content.indexOf(normalized);
+    if (index === -1) return;
+    const from = editor.offsetToPos(index);
+    const to = editor.offsetToPos(index + normalized.length);
+    editor.setSelection(from, to);
+    editor.scrollIntoView({ from, to }, true);
   }
 }

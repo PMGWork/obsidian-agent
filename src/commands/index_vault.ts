@@ -43,7 +43,7 @@ export async function indexVaultCommand(plugin: ObsidianRagPlugin) {
     }
 
     try {
-      await indexFile(plugin, client, storeName, file);
+      await indexFile(plugin, client, storeName, file, mtime);
       plugin.indexState.files[file.path] = { mtime };
       progress.indexed += 1;
       plugin.setStatus(`Indexed ${progress.indexed}/${progress.total} (skipped ${progress.skipped})`);
@@ -62,16 +62,32 @@ async function indexFile(
   plugin: ObsidianRagPlugin,
   client: GeminiClient,
   storeName: string,
-  file: TFile
+  file: TFile,
+  mtime: number
 ) {
   const content = await plugin.app.vault.read(file);
   const bytes = new TextEncoder().encode(content);
   if (bytes.byteLength > 100 * 1024 * 1024) {
     throw new Error(`File too large: ${file.path}`);
   }
+  const chunking = plugin.settings.chunkingEnabled
+    ? {
+        maxTokensPerChunk: plugin.settings.maxTokensPerChunk,
+        maxOverlapTokens: plugin.settings.maxOverlapTokens,
+      }
+    : null;
+
+  const metadata = [
+    { key: "vault", stringValue: plugin.app.vault.getName() },
+    { key: "path", stringValue: file.path },
+    { key: "mtime", numericValue: mtime },
+  ];
+
   const operation = await client.uploadMarkdownToStore(storeName, {
     displayName: file.path,
     bytes,
+    chunking,
+    metadata,
   });
   if (operation?.name) {
     await client.waitForOperation(operation.name);

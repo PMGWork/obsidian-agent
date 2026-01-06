@@ -6,6 +6,10 @@ export interface RagSettings {
   model: string;
   storeName: string;
   storeDisplayName: string;
+  metadataFilter: string;
+  chunkingEnabled: boolean;
+  maxTokensPerChunk: number;
+  maxOverlapTokens: number;
 }
 
 export const DEFAULT_SETTINGS: RagSettings = {
@@ -13,6 +17,10 @@ export const DEFAULT_SETTINGS: RagSettings = {
   model: "gemini-2.5-flash",
   storeName: "",
   storeDisplayName: "obsidian-vault",
+  metadataFilter: "",
+  chunkingEnabled: true,
+  maxTokensPerChunk: 200,
+  maxOverlapTokens: 20,
 };
 
 export class RagSettingTab extends PluginSettingTab {
@@ -79,6 +87,61 @@ export class RagSettingTab extends PluginSettingTab {
           .onChange(async (value) => {
             this.plugin.settings.storeDisplayName = value.trim();
             await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Metadata filter")
+      .setDesc("Optional: filter sources by metadata (AIP-160 syntax). Example: author=\"Alice\"")
+      .addText((text) =>
+        text
+          .setPlaceholder('author="Alice"')
+          .setValue(this.plugin.settings.metadataFilter)
+          .onChange(async (value) => {
+            this.plugin.settings.metadataFilter = value.trim();
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Chunking config")
+      .setDesc("Use custom chunk sizes for File Search indexing (white-space chunking).")
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.chunkingEnabled).onChange(async (value) => {
+          this.plugin.settings.chunkingEnabled = value;
+          await this.plugin.saveSettings();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Max tokens per chunk")
+      .setDesc("Used when chunking is enabled. Default is 200.")
+      .addText((text) =>
+        text
+          .setPlaceholder("200")
+          .setValue(String(this.plugin.settings.maxTokensPerChunk))
+          .onChange(async (value) => {
+            const parsed = Number.parseInt(value, 10);
+            if (!Number.isNaN(parsed) && parsed > 0) {
+              this.plugin.settings.maxTokensPerChunk = parsed;
+              await this.plugin.saveSettings();
+            }
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Max overlap tokens")
+      .setDesc("Used when chunking is enabled. Default is 20.")
+      .addText((text) =>
+        text
+          .setPlaceholder("20")
+          .setValue(String(this.plugin.settings.maxOverlapTokens))
+          .onChange(async (value) => {
+            const parsed = Number.parseInt(value, 10);
+            if (!Number.isNaN(parsed) && parsed >= 0) {
+              this.plugin.settings.maxOverlapTokens = parsed;
+              await this.plugin.saveSettings();
+            }
           })
       );
 

@@ -8,11 +8,10 @@ If your plugin does not need CSS, delete this file.
 */
 
 .gemini-rag-view {
-  padding: 16px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
-  background: linear-gradient(180deg, rgba(120, 140, 180, 0.08), transparent 60%);
+  gap: 12px;
 }
 
 .gemini-rag-header {
@@ -25,20 +24,12 @@ If your plugin does not need CSS, delete this file.
 .gemini-rag-title-wrap {
   display: flex;
   flex-direction: column;
-  gap: 4px;
-}
-
-.gemini-rag-kicker {
-  font-size: 11px;
-  letter-spacing: 0.2em;
-  text-transform: uppercase;
-  opacity: 0.7;
+  gap: 2px;
 }
 
 .gemini-rag-header h2 {
   margin: 0;
-  font-size: 20px;
-  font-family: "IBM Plex Serif", "Merriweather", "Georgia", serif;
+  font-size: 18px;
 }
 
 .gemini-rag-status-pill {
@@ -47,7 +38,6 @@ If your plugin does not need CSS, delete this file.
   border-radius: 999px;
   background: transparent;
   font-size: 11px;
-  letter-spacing: 0.02em;
   align-self: center;
   opacity: 0;
   transition: opacity 0.2s ease;
@@ -64,11 +54,10 @@ If your plugin does not need CSS, delete this file.
   display: flex;
   flex-direction: column;
   gap: 10px;
-  padding: 12px;
-  border-radius: 14px;
+  padding: 10px;
+  border-radius: 8px;
   border: 1px solid var(--background-modifier-border);
   background: var(--background-secondary);
-  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08);
 }
 
 .gemini-rag-label {
@@ -81,10 +70,9 @@ If your plugin does not need CSS, delete this file.
   min-height: 110px;
   resize: vertical;
   padding: 10px 12px;
-  border-radius: 10px;
+  border-radius: 6px;
   border: 1px solid var(--background-modifier-border);
   background: var(--background-primary);
-  font-family: "IBM Plex Sans", "Avenir Next", "Segoe UI", sans-serif;
 }
 
 .gemini-rag-hint {
@@ -99,31 +87,21 @@ If your plugin does not need CSS, delete this file.
 }
 
 .gemini-rag-btn {
-  border-radius: 999px;
-  padding: 6px 14px;
+  border-radius: 6px;
+  padding: 6px 12px;
   border: 1px solid var(--background-modifier-border);
   background: var(--background-primary);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
-.gemini-rag-btn.primary {
-  background: linear-gradient(135deg, #2f3b4f, #4b5f76);
-  color: #f7f7f7;
-  border: none;
-}
-
-.gemini-rag-btn.ghost {
-  background: transparent;
-}
-
-.gemini-rag-btn:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.15);
+.gemini-rag-btn.is-primary {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border-color: transparent;
 }
 
 .gemini-rag-section {
-  padding: 12px 14px;
-  border-radius: 14px;
+  padding: 10px 12px;
+  border-radius: 8px;
   border: 1px solid var(--background-modifier-border);
   background: var(--background-primary);
 }
@@ -131,7 +109,6 @@ If your plugin does not need CSS, delete this file.
 .gemini-rag-section h3 {
   margin: 0 0 8px 0;
   font-size: 12px;
-  letter-spacing: 0.08em;
   text-transform: uppercase;
   opacity: 0.7;
 }
@@ -140,6 +117,16 @@ If your plugin does not need CSS, delete this file.
 .gemini-rag-sources {
   font-size: 13px;
   line-height: 1.6;
+}
+
+.gemini-rag-answer-body :is(h1, h2, h3, h4, h5, h6) {
+  margin: 0.8em 0 0.4em;
+}
+
+.gemini-rag-answer-body pre {
+  padding: 8px;
+  border-radius: 6px;
+  background: var(--background-secondary);
 }
 
 .gemini-rag-sources ol {

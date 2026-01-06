@@ -43,7 +43,12 @@ export class GeminiClient {
 
   async uploadMarkdownToStore(
     storeName: string,
-    payload: { displayName: string; bytes: Uint8Array }
+    payload: {
+      displayName: string;
+      bytes: Uint8Array;
+      chunking?: { maxTokensPerChunk: number; maxOverlapTokens: number } | null;
+      metadata?: Array<{ key: string; stringValue?: string; numericValue?: number }>;
+    }
   ): Promise<UploadOperation> {
     const startResponse = await fetch(
       `${UPLOAD_BASE_URL}/${storeName}:uploadToFileSearchStore`,
@@ -60,6 +65,15 @@ export class GeminiClient {
         body: JSON.stringify({
           displayName: payload.displayName,
           mimeType: "text/markdown",
+          chunkingConfig: payload.chunking
+            ? {
+                whiteSpaceConfig: {
+                  maxTokensPerChunk: payload.chunking.maxTokensPerChunk,
+                  maxOverlapTokens: payload.chunking.maxOverlapTokens,
+                },
+              }
+            : undefined,
+          customMetadata: payload.metadata,
         }),
       }
     );
@@ -109,13 +123,21 @@ export class GeminiClient {
   async generateContent(
     model: string,
     storeName: string,
-    question: string
+    question: string,
+    metadataFilter?: string
   ): Promise<GenerateContentResponse> {
     return (await this.request(`${BASE_URL}/models/${model}:generateContent`, {
       method: "POST",
       body: JSON.stringify({
         contents: [{ role: "user", parts: [{ text: question }] }],
-        tools: [{ fileSearch: { fileSearchStoreNames: [storeName] } }],
+        tools: [
+          {
+            fileSearch: {
+              fileSearchStoreNames: [storeName],
+              metadataFilter: metadataFilter || undefined,
+            },
+          },
+        ],
       }),
     })) as GenerateContentResponse;
   }
