@@ -19,11 +19,9 @@ export class RagView extends ItemView {
   private plugin: ObsidianRagPlugin;
   private cleanupStatus?: () => void;
   private statusEl?: HTMLElement;
-  private answerEl?: HTMLElement;
-  private answerBodyEl?: HTMLElement;
   private sourcesEl?: HTMLElement;
   private hintEl?: HTMLElement;
-  private historyEl?: HTMLElement;
+  private chatEl?: HTMLElement;
   private sourcesMap = new Map<number, SourceItem>();
 
   constructor(leaf: WorkspaceLeaf, plugin: ObsidianRagPlugin) {
@@ -36,7 +34,7 @@ export class RagView extends ItemView {
   }
 
   getDisplayText(): string {
-    return "Gemini RAG";
+    return "Obsidian Agent";
   }
 
   async onOpen(): Promise<void> {
@@ -66,8 +64,27 @@ export class RagView extends ItemView {
 
     const header = contentEl.createEl("div", { cls: "gemini-rag-header" });
     const titleWrap = header.createEl("div", { cls: "gemini-rag-title-wrap" });
-    titleWrap.createEl("h2", { text: "Gemini RAG" });
+    titleWrap.createEl("h2", { text: "Obsidian Agent" });
     this.statusEl = header.createEl("div", { cls: "gemini-rag-status-pill" });
+
+    this.chatEl = contentEl.createEl("div", { cls: "gemini-rag-chat" });
+    this.chatEl.addEventListener("click", (event) => {
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+      const link = target.closest("a");
+      if (!link) return;
+      const href = link.getAttribute("href");
+      if (!href || !href.startsWith("citation:")) return;
+      event.preventDefault();
+      const indexText = href.replace("citation:", "");
+      const index = Number(indexText);
+      if (!Number.isFinite(index)) return;
+      const source = this.sourcesMap.get(index);
+      if (source) {
+        void this.openSource(source, true);
+      }
+    });
+    this.renderHistory();
 
     const controls = contentEl.createEl("div", { cls: "gemini-rag-controls" });
     const inputLabel = controls.createEl("div", { cls: "gemini-rag-label" });
@@ -108,35 +125,10 @@ export class RagView extends ItemView {
       await createStoreCommand(this.plugin);
     });
 
-    const answerSection = contentEl.createEl("div", { cls: "gemini-rag-section" });
-    answerSection.createEl("h3", { text: "Answer" });
-    this.answerEl = answerSection.createEl("div", { cls: "gemini-rag-answer" });
-    this.answerBodyEl = this.answerEl.createEl("div", { cls: "gemini-rag-answer-body" });
-    this.answerBodyEl.addEventListener("click", (event) => {
-      const target = event.target as HTMLElement | null;
-      if (!target) return;
-      const link = target.closest("a");
-      if (!link) return;
-      const href = link.getAttribute("href");
-      if (!href || !href.startsWith("citation:")) return;
-      event.preventDefault();
-      const indexText = href.replace("citation:", "");
-      const index = Number(indexText);
-      if (!Number.isFinite(index)) return;
-      const source = this.sourcesMap.get(index);
-      if (source) {
-        void this.openSource(source, true);
-      }
-    });
-
     const sourcesSection = contentEl.createEl("div", { cls: "gemini-rag-section" });
     sourcesSection.createEl("h3", { text: "Sources" });
     this.sourcesEl = sourcesSection.createEl("div", { cls: "gemini-rag-sources" });
 
-    const historySection = contentEl.createEl("div", { cls: "gemini-rag-section" });
-    historySection.createEl("h3", { text: "History" });
-    this.historyEl = historySection.createEl("div", { cls: "gemini-rag-history" });
-    this.renderHistory();
   }
 
   private async ask(question: string) {
@@ -159,7 +151,6 @@ export class RagView extends ItemView {
         this.statusEl.setText("Thinking...");
         this.statusEl.addClass("is-active");
       }
-      if (this.answerBodyEl) this.answerBodyEl.setText("");
       if (this.sourcesEl) this.sourcesEl.setText("");
 
       const response = await client.generateContent(
@@ -175,18 +166,9 @@ export class RagView extends ItemView {
         this.sourcesMap.set(source.index, source);
       }
       const annotatedText = this.annotateAnswer(text, grounding, sources);
-      if (this.answerBodyEl) {
-        this.answerBodyEl.empty();
-        await MarkdownRenderer.renderMarkdown(
-          annotatedText,
-          this.answerBodyEl,
-          this.plugin.app.vault.getRoot().path,
-          this
-        );
-      }
-
       this.pushHistory(question, annotatedText);
       this.renderHistory();
+
 
       if (this.sourcesEl) {
         if (sources.length === 0) {
@@ -225,7 +207,7 @@ export class RagView extends ItemView {
       question,
       answer,
     };
-    const maxItems = 30;
+    const maxItems = 50;
     this.plugin.history.unshift(entry);
     if (this.plugin.history.length > maxItems) {
       this.plugin.history = this.plugin.history.slice(0, maxItems);
@@ -234,17 +216,21 @@ export class RagView extends ItemView {
   }
 
   private renderHistory() {
-    if (!this.historyEl) return;
-    this.historyEl.empty();
+    if (!this.chatEl) return;
+    this.chatEl.empty();
     if (!this.plugin.history.length) {
-      this.historyEl.createEl("div", { text: "No history yet." });
+      this.chatEl.createEl("div", { cls: "gemini-rag-chat-empty", text: "No messages yet." });
       return;
     }
 
     for (const entry of this.plugin.history) {
-      const item = this.historyEl.createEl("div", { cls: "gemini-rag-history-item" });
-      item.createEl("div", { cls: "gemini-rag-history-question", text: entry.question });
-      const answerEl = item.createEl("div", { cls: "gemini-rag-history-answer" });
+      const userBubble = this.chatEl.createEl("div", { cls: "gemini-rag-chat-bubble user" });
+      userBubble.createEl("div", { cls: "gemini-rag-chat-role", text: "You" });
+      userBubble.createEl("div", { cls: "gemini-rag-chat-text", text: entry.question });
+
+      const assistantBubble = this.chatEl.createEl("div", { cls: "gemini-rag-chat-bubble assistant" });
+      assistantBubble.createEl("div", { cls: "gemini-rag-chat-role", text: "Obsidian Agent" });
+      const answerEl = assistantBubble.createEl("div", { cls: "gemini-rag-chat-text" });
       void MarkdownRenderer.renderMarkdown(
         entry.answer,
         answerEl,
@@ -253,6 +239,7 @@ export class RagView extends ItemView {
       );
     }
   }
+
 
   private extractSources(grounding?: { groundingChunks?: Array<Record<string, unknown>> }): SourceItem[] {
     if (!grounding?.groundingChunks) {
@@ -364,7 +351,7 @@ export class RagView extends ItemView {
         if (highlight && source.text) {
           const view = leaf.view;
           if (view instanceof MarkdownView && view.editor) {
-            await this.highlightSnippet(view.editor, source.text);
+            await this.highlightSnippet(view.editor, source.text, 6);
           }
         }
         return;
@@ -379,15 +366,31 @@ export class RagView extends ItemView {
     }
   }
 
-  private async highlightSnippet(editor: Editor, snippet: string) {
+  private async highlightSnippet(editor: Editor, snippet: string, minLength: number) {
     const content = editor.getValue();
     const normalized = snippet.trim();
     if (!normalized) return;
-    const index = content.indexOf(normalized);
-    if (index === -1) return;
+    let index = content.indexOf(normalized);
+    if (index === -1) {
+      index = this.findApproximateMatch(content, normalized, minLength);
+      if (index === -1) return;
+    }
     const from = editor.offsetToPos(index);
     const to = editor.offsetToPos(index + normalized.length);
     editor.setSelection(from, to);
     editor.scrollIntoView({ from, to }, true);
+  }
+
+  private findApproximateMatch(text: string, snippet: string, minLength: number): number {
+    const cleanSnippet = snippet.replace(/\s+/g, " ").trim();
+    if (cleanSnippet.length < minLength) return -1;
+    const tokens = cleanSnippet.split(" ").filter((token) => token.length >= minLength);
+    for (const token of tokens) {
+      const index = text.indexOf(token);
+      if (index !== -1) {
+        return index;
+      }
+    }
+    return -1;
   }
 }

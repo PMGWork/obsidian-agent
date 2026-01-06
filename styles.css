@@ -60,6 +60,48 @@ If your plugin does not need CSS, delete this file.
   background: var(--background-secondary);
 }
 
+.gemini-rag-chat {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 8px;
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+  background: var(--background-primary);
+  max-height: 45vh;
+  overflow-y: auto;
+}
+
+.gemini-rag-chat-empty {
+  font-size: 12px;
+  opacity: 0.7;
+}
+
+.gemini-rag-chat-bubble {
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--background-modifier-border);
+}
+
+.gemini-rag-chat-bubble.user {
+  background: var(--background-secondary);
+}
+
+.gemini-rag-chat-bubble.assistant {
+  background: var(--background-primary);
+}
+
+.gemini-rag-chat-role {
+  font-size: 11px;
+  opacity: 0.6;
+  margin-bottom: 4px;
+}
+
+.gemini-rag-chat-text {
+  font-size: 13px;
+  line-height: 1.6;
+}
+
 .gemini-rag-label {
   font-size: 13px;
   font-weight: 600;
@@ -117,28 +159,6 @@ If your plugin does not need CSS, delete this file.
 .gemini-rag-sources {
   font-size: 13px;
   line-height: 1.6;
-}
-
-.gemini-rag-history {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.gemini-rag-history-item {
-  padding: 8px 10px;
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 6px;
-  background: var(--background-secondary);
-}
-
-.gemini-rag-history-question {
-  font-weight: 600;
-  margin-bottom: 6px;
-}
-
-.gemini-rag-history-answer {
-  font-size: 12px;
 }
 
 .gemini-rag-answer-body :is(h1, h2, h3, h4, h5, h6) {

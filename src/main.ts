@@ -74,4 +74,9 @@ export default class ObsidianRagPlugin extends Plugin {
     this.indexState = Object.assign({}, DEFAULT_INDEX_STATE);
     await this.saveSettings();
   }
+
+  async resetIndexStateForStore(storeName: string) {
+    this.indexState = Object.assign({}, DEFAULT_INDEX_STATE, { storeName });
+    await this.saveSettings();
+  }
 }

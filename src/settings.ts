@@ -35,7 +35,7 @@ export class RagSettingTab extends PluginSettingTab {
     const { containerEl } = this;
     containerEl.empty();
 
-    containerEl.createEl("h2", { text: "Gemini RAG settings" });
+    containerEl.createEl("h2", { text: "Obsidian Agent settings" });
 
     new Setting(containerEl)
       .setName("API key")

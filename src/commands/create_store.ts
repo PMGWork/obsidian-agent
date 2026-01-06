@@ -19,6 +19,7 @@ export async function createStoreCommand(plugin: ObsidianRagPlugin) {
     plugin.setStatus("Creating File Search store...");
     const store = await client.createFileSearchStore(displayName);
     plugin.settings.storeName = store.name ?? "";
+    await plugin.resetIndexStateForStore(plugin.settings.storeName);
     await plugin.saveSettings();
     new Notice(`Store created: ${store.name ?? "unknown"}`);
   } catch (error) {

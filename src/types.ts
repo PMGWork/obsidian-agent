@@ -1,6 +1,7 @@
 export type IndexState = {
   version: number;
   files: Record<string, { mtime: number }>;
+  storeName?: string;
 };
 
 export const DEFAULT_INDEX_STATE: IndexState = {
