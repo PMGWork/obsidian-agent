@@ -12,6 +12,8 @@ If your plugin does not need CSS, delete this file.
   display: flex;
   flex-direction: column;
   gap: 12px;
+  height: 100%;
+  min-height: 0;
 }
 
 .gemini-rag-header {
@@ -50,6 +52,14 @@ If your plugin does not need CSS, delete this file.
   background: var(--background-secondary);
 }
 
+.gemini-rag-main {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+}
+
 .gemini-rag-controls {
   display: flex;
   flex-direction: column;
@@ -58,6 +68,9 @@ If your plugin does not need CSS, delete this file.
   border-radius: 8px;
   border: 1px solid var(--background-modifier-border);
   background: var(--background-secondary);
+  position: sticky;
+  bottom: 0;
+  box-shadow: 0 -10px 20px rgba(0, 0, 0, 0.12);
 }
 
 .gemini-rag-chat {
@@ -65,11 +78,10 @@ If your plugin does not need CSS, delete this file.
   flex-direction: column;
   gap: 10px;
   padding: 8px;
-  border-radius: 8px;
-  border: 1px solid var(--background-modifier-border);
-  background: var(--background-primary);
-  max-height: 45vh;
+  background: transparent;
   overflow-y: auto;
+  flex: 1;
+  min-height: 0;
 }
 
 .gemini-rag-chat-empty {
@@ -84,11 +96,19 @@ If your plugin does not need CSS, delete this file.
 }
 
 .gemini-rag-chat-bubble.user {
-  background: var(--background-secondary);
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  align-self: flex-end;
+  max-width: 72%;
+  border: none;
+  border-radius: 18px;
 }
 
 .gemini-rag-chat-bubble.assistant {
-  background: var(--background-primary);
+  background: transparent;
+  border: none;
+  padding: 0;
+  align-self: stretch;
 }
 
 .gemini-rag-chat-role {
@@ -100,6 +120,26 @@ If your plugin does not need CSS, delete this file.
 .gemini-rag-chat-text {
   font-size: 13px;
   line-height: 1.6;
+}
+
+.gemini-rag-chat-text a[href^="citation:"] {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 6px;
+  margin-left: 4px;
+  border-radius: 999px;
+  font-size: 11px;
+  line-height: 1;
+  color: var(--text-on-accent);
+  background: var(--interactive-accent);
+  text-decoration: none;
+}
+
+.gemini-rag-chat-text a[href^="citation:"]:hover {
+  opacity: 0.9;
 }
 
 .gemini-rag-label {
@@ -141,20 +181,6 @@ If your plugin does not need CSS, delete this file.
   border-color: transparent;
 }
 
-.gemini-rag-section {
-  padding: 10px 12px;
-  border-radius: 8px;
-  border: 1px solid var(--background-modifier-border);
-  background: var(--background-primary);
-}
-
-.gemini-rag-section h3 {
-  margin: 0 0 8px 0;
-  font-size: 12px;
-  text-transform: uppercase;
-  opacity: 0.7;
-}
-
 .gemini-rag-answer,
 .gemini-rag-sources {
   font-size: 13px;
@@ -169,6 +195,24 @@ If your plugin does not need CSS, delete this file.
   padding: 8px;
   border-radius: 6px;
   background: var(--background-secondary);
+}
+
+.gemini-rag-sources-section {
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  background: var(--background-primary);
+}
+
+.gemini-rag-sources-section > summary {
+  cursor: pointer;
+  font-size: 12px;
+  opacity: 0.7;
+  list-style: none;
+}
+
+.gemini-rag-sources-section > summary::-webkit-details-marker {
+  display: none;
 }
 
 .gemini-rag-sources ol {

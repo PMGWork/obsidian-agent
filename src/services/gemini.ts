@@ -12,7 +12,7 @@ type UploadOperation = {
 
 type GenerateContentResponse = {
   candidates?: Array<{
-    content?: { parts?: Array<{ text?: string }> };
+    content?: { parts?: Array<{ text?: string; thought?: boolean }> };
     groundingMetadata?: GroundingMetadata;
     grounding_metadata?: GroundingMetadata;
   }>;
@@ -132,7 +132,8 @@ export class GeminiClient {
     model: string,
     storeName: string,
     question: string,
-    metadataFilter?: string
+    metadataFilter?: string,
+    includeThoughts?: boolean
   ): Promise<GenerateContentResponse> {
     return (await this.request(`${BASE_URL}/models/${model}:generateContent`, {
       method: "POST",
@@ -146,6 +147,13 @@ export class GeminiClient {
             },
           },
         ],
+        generationConfig: includeThoughts
+          ? {
+              thinkingConfig: {
+                includeThoughts: true,
+              },
+            }
+          : undefined,
       }),
     })) as GenerateContentResponse;
   }
@@ -153,12 +161,27 @@ export class GeminiClient {
   extractAnswer(response: GenerateContentResponse): {
     text: string;
     grounding?: GroundingMetadata;
+    thoughtSummary?: string;
   } {
     const candidate = response.candidates?.[0];
     const parts = candidate?.content?.parts ?? [];
-    const text = parts.map((part) => part.text ?? "").join("");
+    const thoughtParts: string[] = [];
+    const answerParts: string[] = [];
+    for (const part of parts) {
+      const text = part.text ?? "";
+      if (!text) {
+        continue;
+      }
+      if (part.thought) {
+        thoughtParts.push(text);
+      } else {
+        answerParts.push(text);
+      }
+    }
+    const text = answerParts.join("");
+    const thoughtSummary = thoughtParts.join("");
     const grounding = candidate?.groundingMetadata ?? candidate?.grounding_metadata;
-    return { text, grounding };
+    return { text, grounding, thoughtSummary: thoughtSummary || undefined };
   }
 
   private async request(url: string, init: RequestInit): Promise<unknown> {

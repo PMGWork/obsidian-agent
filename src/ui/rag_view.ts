@@ -19,6 +19,8 @@ export class RagView extends ItemView {
   private plugin: ObsidianRagPlugin;
   private cleanupStatus?: () => void;
   private statusEl?: HTMLElement;
+  private sourcesSection?: HTMLDetailsElement;
+  private sourcesSummaryEl?: HTMLElement;
   private sourcesEl?: HTMLElement;
   private hintEl?: HTMLElement;
   private chatEl?: HTMLElement;
@@ -67,7 +69,8 @@ export class RagView extends ItemView {
     titleWrap.createEl("h2", { text: "Obsidian Agent" });
     this.statusEl = header.createEl("div", { cls: "gemini-rag-status-pill" });
 
-    this.chatEl = contentEl.createEl("div", { cls: "gemini-rag-chat" });
+    const main = contentEl.createEl("div", { cls: "gemini-rag-main" });
+    this.chatEl = main.createEl("div", { cls: "gemini-rag-chat" });
     this.chatEl.addEventListener("click", (event) => {
       const target = event.target as HTMLElement | null;
       if (!target) return;
@@ -85,6 +88,10 @@ export class RagView extends ItemView {
       }
     });
     this.renderHistory();
+
+    this.sourcesSection = main.createEl("details", { cls: "gemini-rag-sources-section" }) as HTMLDetailsElement;
+    this.sourcesSummaryEl = this.sourcesSection.createEl("summary", { text: "引用一覧" });
+    this.sourcesEl = this.sourcesSection.createEl("div", { cls: "gemini-rag-sources" });
 
     const controls = contentEl.createEl("div", { cls: "gemini-rag-controls" });
     const inputLabel = controls.createEl("div", { cls: "gemini-rag-label" });
@@ -124,11 +131,6 @@ export class RagView extends ItemView {
     storeButton.addEventListener("click", async () => {
       await createStoreCommand(this.plugin);
     });
-
-    const sourcesSection = contentEl.createEl("div", { cls: "gemini-rag-section" });
-    sourcesSection.createEl("h3", { text: "Sources" });
-    this.sourcesEl = sourcesSection.createEl("div", { cls: "gemini-rag-sources" });
-
   }
 
   private async ask(question: string) {
@@ -157,19 +159,26 @@ export class RagView extends ItemView {
         model,
         storeName,
         question,
-        this.plugin.settings.metadataFilter || undefined
+        this.plugin.settings.metadataFilter || undefined,
+        this.plugin.settings.showReasoningSummary
       );
-      const { text, grounding } = client.extractAnswer(response);
+      const { text, grounding, thoughtSummary } = client.extractAnswer(response);
       const sources = this.extractSources(grounding);
       this.sourcesMap.clear();
       for (const source of sources) {
         this.sourcesMap.set(source.index, source);
       }
       const annotatedText = this.annotateAnswer(text, grounding, sources);
-      this.pushHistory(question, annotatedText);
+      const output = this.formatOutput(annotatedText, thoughtSummary);
+      this.pushHistory(question, output);
       this.renderHistory();
 
-
+      if (this.sourcesSummaryEl) {
+        this.sourcesSummaryEl.setText(`引用一覧 (${sources.length})`);
+      }
+      if (this.sourcesSection) {
+        this.sourcesSection.open = false;
+      }
       if (this.sourcesEl) {
         if (sources.length === 0) {
           this.sourcesEl.createEl("div", { text: "No sources returned." });
@@ -198,6 +207,21 @@ export class RagView extends ItemView {
         this.statusEl.removeClass("is-active");
       }
     }
+  }
+
+  private formatOutput(answer: string, thoughtSummary?: string): string {
+    if (!this.plugin.settings.showReasoningSummary || !thoughtSummary) {
+      return answer;
+    }
+    const title = this.plugin.settings.reasoningTitle?.trim() || "推論の要約";
+    const summary = thoughtSummary.trim();
+    if (!summary) {
+      return answer;
+    }
+    if (!answer.trim()) {
+      return `**${title}**\n\n${summary}`;
+    }
+    return `**${title}**\n\n${summary}\n\n${answer}`;
   }
 
   private pushHistory(question: string, answer: string) {
@@ -302,7 +326,7 @@ export class RagView extends ItemView {
     for (const [pos, numbers] of positionMap.entries()) {
       const unique = Array.from(new Set(numbers)).sort((a, b) => a - b);
       const marker = unique.map((value) => `[${value}](citation:${value})`).join(" ");
-      insertions.push({ pos, marker: ` ${marker}` });
+      insertions.push({ pos, marker });
     }
 
     insertions.sort((a, b) => b.pos - a.pos);
@@ -321,14 +345,112 @@ export class RagView extends ItemView {
     if (startIndex >= text.length) {
       return text.length;
     }
-    const endChars = [".", "!", "?", "。", "！", "？", "\n"];
+    const endChars = [".", "!", "?", "。", "！", "？"];
+    const closingChars = new Set([
+      "」",
+      "』",
+      "）",
+      ")",
+      "】",
+      "]",
+      "］",
+      "｝",
+      "}",
+      "〉",
+      "》",
+      "”",
+      "\"",
+      "’",
+      "'",
+    ]);
+    let endIndex = -1;
     for (let i = Math.max(0, startIndex); i < text.length; i += 1) {
       const char = text.charAt(i);
+      if (char === "\r" && text.charAt(i + 1) === "\n") {
+        if (text.charAt(i + 2) === "\n") {
+          endIndex = i;
+          break;
+        }
+        if (this.isLineBreakBoundary(text, i + 2)) {
+          endIndex = i;
+          break;
+        }
+        continue;
+      }
+      if (char === "\n" && text.charAt(i + 1) === "\n") {
+        endIndex = i;
+        break;
+      }
+      if (char === "\n" && this.isLineBreakBoundary(text, i + 1)) {
+        endIndex = i;
+        break;
+      }
       if (endChars.includes(char)) {
-        return i + 1;
+        endIndex = i + 1;
+        break;
       }
     }
-    return text.length;
+    if (endIndex === -1) {
+      return text.length;
+    }
+    let cursor = endIndex;
+    while (cursor < text.length) {
+      const char = text.charAt(cursor);
+      if (endChars.includes(char)) {
+        cursor += 1;
+        continue;
+      }
+      if (closingChars.has(char)) {
+        cursor += 1;
+        continue;
+      }
+      break;
+    }
+    return cursor;
+  }
+
+  private isLineBreakBoundary(text: string, startIndex: number): boolean {
+    let cursor = startIndex;
+    while (cursor < text.length) {
+      const char = text.charAt(cursor);
+      if (char !== " " && char !== "\t") {
+        break;
+      }
+      cursor += 1;
+    }
+    if (cursor >= text.length) {
+      return true;
+    }
+    const nextChar = text.charAt(cursor);
+    if (nextChar === "\n") {
+      return true;
+    }
+    if (nextChar === ">") {
+      return true;
+    }
+    if (nextChar === "-" || nextChar === "*" || nextChar === "+") {
+      return text.charAt(cursor + 1) === " ";
+    }
+    if (nextChar === "#") {
+      let count = 0;
+      while (cursor + count < text.length && text.charAt(cursor + count) === "#") {
+        count += 1;
+      }
+      return count > 0 && count <= 6 && text.charAt(cursor + count) === " ";
+    }
+    if (nextChar >= "0" && nextChar <= "9") {
+      let index = cursor;
+      while (index < text.length) {
+        const digit = text.charAt(index);
+        if (digit < "0" || digit > "9") {
+          break;
+        }
+        index += 1;
+      }
+      const marker = text.charAt(index);
+      return (marker === "." || marker === ")") && text.charAt(index + 1) === " ";
+    }
+    return false;
   }
 
   private resolveVaultPath(title?: string): string | undefined {

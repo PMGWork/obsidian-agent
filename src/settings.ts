@@ -10,6 +10,8 @@ export interface RagSettings {
   chunkingEnabled: boolean;
   maxTokensPerChunk: number;
   maxOverlapTokens: number;
+  showReasoningSummary: boolean;
+  reasoningTitle: string;
 }
 
 export const DEFAULT_SETTINGS: RagSettings = {
@@ -21,6 +23,8 @@ export const DEFAULT_SETTINGS: RagSettings = {
   chunkingEnabled: true,
   maxTokensPerChunk: 200,
   maxOverlapTokens: 20,
+  showReasoningSummary: false,
+  reasoningTitle: "推論の要約",
 };
 
 export class RagSettingTab extends PluginSettingTab {
@@ -60,6 +64,29 @@ export class RagSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.model)
           .onChange(async (value) => {
             this.plugin.settings.model = value.trim();
+            await this.plugin.saveSettings();
+          })
+      );
+
+    new Setting(containerEl)
+      .setName("Show thought summaries")
+      .setDesc("Adds a short thought summary section (no detailed steps).")
+      .addToggle((toggle) =>
+        toggle.setValue(this.plugin.settings.showReasoningSummary).onChange(async (value) => {
+          this.plugin.settings.showReasoningSummary = value;
+          await this.plugin.saveSettings();
+        })
+      );
+
+    new Setting(containerEl)
+      .setName("Thought title")
+      .setDesc("Heading used for the thought summary section.")
+      .addText((text) =>
+        text
+          .setPlaceholder("推論の要約")
+          .setValue(this.plugin.settings.reasoningTitle)
+          .onChange(async (value) => {
+            this.plugin.settings.reasoningTitle = value.trim();
             await this.plugin.saveSettings();
           })
       );
