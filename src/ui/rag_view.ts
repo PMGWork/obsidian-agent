@@ -82,6 +82,7 @@ export class RagView extends ItemView {
       const indexText = href.replace("citation:", "");
       const index = Number(indexText);
       if (!Number.isFinite(index)) return;
+      this.focusSource(index);
       const source = this.sourcesMap.get(index);
       if (source) {
         void this.openSource(source, true);
@@ -104,6 +105,7 @@ export class RagView extends ItemView {
     this.hintEl.setText("⌘/Ctrl + Enter で送信");
 
     const buttons = controls.createEl("div", { cls: "gemini-rag-buttons" });
+    const newChatButton = buttons.createEl("button", { cls: "gemini-rag-btn", text: "New chat" });
     const askButton = buttons.createEl("button", { cls: "gemini-rag-btn is-primary", text: "Ask" });
     const indexButton = buttons.createEl("button", { cls: "gemini-rag-btn", text: "Index vault" });
     const storeButton = buttons.createEl("button", { cls: "gemini-rag-btn", text: "Create store" });
@@ -115,6 +117,10 @@ export class RagView extends ItemView {
       }
       await this.ask(question);
     };
+
+    newChatButton.addEventListener("click", async () => {
+      await this.clearChat();
+    });
 
     askButton.addEventListener("click", triggerAsk);
     input.addEventListener("keydown", async (event) => {
@@ -131,6 +137,38 @@ export class RagView extends ItemView {
     storeButton.addEventListener("click", async () => {
       await createStoreCommand(this.plugin);
     });
+  }
+
+  async clearChat() {
+    this.plugin.history = [];
+    await this.plugin.saveSettings();
+    this.sourcesMap.clear();
+    if (this.sourcesEl) {
+      this.sourcesEl.setText("");
+    }
+    if (this.sourcesSummaryEl) {
+      this.sourcesSummaryEl.setText("引用一覧 (0)");
+    }
+    if (this.sourcesSection) {
+      this.sourcesSection.open = false;
+    }
+    this.renderHistory();
+  }
+
+  private focusSource(index: number) {
+    if (!this.sourcesSection || !this.sourcesEl) {
+      return;
+    }
+    this.sourcesSection.open = true;
+    const items = this.sourcesEl.querySelectorAll<HTMLElement>(".gemini-rag-source-item");
+    items.forEach((item) => {
+      item.removeClass("is-active");
+    });
+    const target = this.sourcesEl.querySelector<HTMLElement>(`[data-source-index="${index}"]`);
+    if (target) {
+      target.addClass("is-active");
+      target.scrollIntoView({ block: "nearest" });
+    }
   }
 
   private async ask(question: string) {
@@ -186,12 +224,15 @@ export class RagView extends ItemView {
           const list = this.sourcesEl.createEl("ol");
           for (const source of sources) {
             const item = list.createEl("li");
+            item.addClass("gemini-rag-source-item");
+            item.setAttr("data-source-index", String(source.index));
             const link = item.createEl("a", {
               text: `[${source.index}] ${source.label}`,
               cls: "gemini-rag-source-link",
             });
             link.addEventListener("click", (event) => {
               event.preventDefault();
+              this.focusSource(source.index);
               void this.openSource(source, true);
             });
           }
@@ -249,11 +290,9 @@ export class RagView extends ItemView {
 
     for (const entry of this.plugin.history) {
       const userBubble = this.chatEl.createEl("div", { cls: "gemini-rag-chat-bubble user" });
-      userBubble.createEl("div", { cls: "gemini-rag-chat-role", text: "You" });
       userBubble.createEl("div", { cls: "gemini-rag-chat-text", text: entry.question });
 
       const assistantBubble = this.chatEl.createEl("div", { cls: "gemini-rag-chat-bubble assistant" });
-      assistantBubble.createEl("div", { cls: "gemini-rag-chat-role", text: "Obsidian Agent" });
       const answerEl = assistantBubble.createEl("div", { cls: "gemini-rag-chat-text" });
       void MarkdownRenderer.renderMarkdown(
         entry.answer,
@@ -460,6 +499,13 @@ export class RagView extends ItemView {
     const file = this.app.vault.getAbstractFileByPath(title);
     if (file) {
       return title;
+    }
+    const normalized = title.replace(/\.md$/i, "");
+    const files = this.app.vault.getFiles();
+    for (const candidate of files) {
+      if (candidate.basename === normalized) {
+        return candidate.path;
+      }
     }
     return undefined;
   }

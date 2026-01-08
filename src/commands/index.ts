@@ -2,12 +2,19 @@ import ObsidianRagPlugin from "../main";
 import { openRagPanel } from "./open_panel";
 import { indexVaultCommand } from "./index_vault";
 import { createStoreCommand } from "./create_store";
+import { newChatCommand } from "./new_chat";
 
 export function registerCommands(plugin: ObsidianRagPlugin) {
   plugin.addCommand({
     id: "open-gemini-rag-panel",
     name: "Open Obsidian Agent panel",
     callback: () => openRagPanel(plugin),
+  });
+
+  plugin.addCommand({
+    id: "new-chat-obsidian-agent",
+    name: "New chat (Obsidian Agent)",
+    callback: () => newChatCommand(plugin),
   });
 
   plugin.addCommand({

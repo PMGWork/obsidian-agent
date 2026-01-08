@@ -220,6 +220,15 @@ If your plugin does not need CSS, delete this file.
   padding-left: 20px;
 }
 
+.gemini-rag-source-item {
+  border-radius: 6px;
+  padding: 2px 4px;
+}
+
+.gemini-rag-source-item.is-active {
+  background: var(--background-secondary);
+}
+
 .gemini-rag-source-link {
   cursor: pointer;
   color: var(--text-accent);

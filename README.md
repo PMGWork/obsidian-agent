@@ -31,7 +31,7 @@ RAG over your Obsidian vault using Gemini File Search.
 ## Settings
 
 - API key (Gemini API key)
-- Model (e.g. `gemini-2.5-flash`)
+- Model (e.g. `gemini-3-flash-preview`)
 - File Search store name (e.g. `fileSearchStores/...`)
 - Store display name
 - Metadata filter (AIP-160 syntax)

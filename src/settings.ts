@@ -16,7 +16,7 @@ export interface RagSettings {
 
 export const DEFAULT_SETTINGS: RagSettings = {
   apiKey: "",
-  model: "gemini-2.5-flash",
+  model: "gemini-3-flash-preview",
   storeName: "",
   storeDisplayName: "obsidian-vault",
   metadataFilter: "",
@@ -60,7 +60,7 @@ export class RagSettingTab extends PluginSettingTab {
       .setDesc("Model used for answering queries.")
       .addText((text) =>
         text
-          .setPlaceholder("gemini-2.5-flash")
+          .setPlaceholder("gemini-3-flash-preview")
           .setValue(this.plugin.settings.model)
           .onChange(async (value) => {
             this.plugin.settings.model = value.trim();
