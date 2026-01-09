@@ -1,7 +1,8 @@
 import ObsidianRagPlugin from "../main";
-import { RAG_VIEW_TYPE, RagView } from "../ui/rag_view";
+import { RAG_VIEW_TYPE, RagView } from "../ui/chat_view";
 import { openRagPanel } from "./open_panel";
 
+// 新しいチャットを開始するコマンド
 export async function newChatCommand(plugin: ObsidianRagPlugin) {
   await openRagPanel(plugin);
   const leaves = plugin.app.workspace.getLeavesOfType(RAG_VIEW_TYPE);

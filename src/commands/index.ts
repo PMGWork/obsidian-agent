@@ -4,28 +4,29 @@ import { indexVaultCommand } from "./index_vault";
 import { createStoreCommand } from "./create_store";
 import { newChatCommand } from "./new_chat";
 
+// コマンドを登録する
 export function registerCommands(plugin: ObsidianRagPlugin) {
   plugin.addCommand({
     id: "open-gemini-rag-panel",
-    name: "Open Obsidian Agent panel",
+    name: "Open panel",
     callback: () => openRagPanel(plugin),
   });
 
   plugin.addCommand({
-    id: "new-chat-obsidian-agent",
-    name: "New chat (Obsidian Agent)",
+    id: "new-chat",
+    name: "New chat",
     callback: () => newChatCommand(plugin),
   });
 
   plugin.addCommand({
     id: "index-vault-to-file-search",
-    name: "Index vault to File Search (Obsidian Agent)",
+    name: "Index vault to file search",
     callback: () => indexVaultCommand(plugin),
   });
 
   plugin.addCommand({
     id: "create-file-search-store",
-    name: "Create File Search store (Obsidian Agent)",
+    name: "Create file search store",
     callback: () => createStoreCommand(plugin),
   });
 }

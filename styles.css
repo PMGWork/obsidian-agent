@@ -8,233 +8,314 @@ If your plugin does not need CSS, delete this file.
 */
 
 .gemini-rag-view {
-  padding: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  height: 100%;
-  min-height: 0;
+	padding: 12px;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	height: 100%;
+	min-height: 0;
 }
 
 .gemini-rag-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 12px;
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: 12px;
+}
+
+.gemini-rag-header-actions {
+	display: flex;
+	align-items: center;
+	gap: 8px;
 }
 
 .gemini-rag-title-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
 }
 
 .gemini-rag-header h2 {
-  margin: 0;
-  font-size: 18px;
+	margin: 0;
+	font-size: 18px;
 }
 
 .gemini-rag-status-pill {
-  min-height: 22px;
-  padding: 2px 10px;
-  border-radius: 999px;
-  background: transparent;
-  font-size: 11px;
-  align-self: center;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-  border: 1px solid transparent;
+	min-height: 22px;
+	padding: 2px 10px;
+	border-radius: 999px;
+	background: transparent;
+	font-size: 11px;
+	align-self: center;
+	opacity: 0;
+	transition: opacity 0.2s ease;
+	border: 1px solid transparent;
 }
 
 .gemini-rag-status-pill.is-active {
-  opacity: 1;
-  border-color: var(--background-modifier-border);
-  background: var(--background-secondary);
+	opacity: 1;
+	border-color: var(--background-modifier-border);
+	background: var(--background-secondary);
+}
+
+.gemini-rag-icon-btn {
+	width: 28px;
+	height: 28px;
+	border-radius: 999px;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-primary);
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	cursor: pointer;
+}
+
+.gemini-rag-icon-btn:hover {
+	background: var(--background-secondary);
+}
+
+.gemini-rag-icon-btn svg {
+	width: 16px;
+	height: 16px;
 }
 
 .gemini-rag-main {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  flex: 1;
-  min-height: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+	flex: 1;
+	min-height: 0;
 }
 
 .gemini-rag-controls {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 10px;
-  border-radius: 8px;
-  border: 1px solid var(--background-modifier-border);
-  background: var(--background-secondary);
-  position: sticky;
-  bottom: 0;
-  box-shadow: 0 -10px 20px rgba(0, 0, 0, 0.12);
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	padding: 10px;
+	border-radius: 8px;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-secondary);
+	position: sticky;
+	bottom: 0;
+	box-shadow: 0 -10px 20px rgba(0, 0, 0, 0.12);
 }
 
 .gemini-rag-chat {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  padding: 8px;
-  background: transparent;
-  overflow-y: auto;
-  flex: 1;
-  min-height: 0;
+	display: flex;
+	flex-direction: column;
+	gap: 10px;
+	padding: 8px;
+	background: transparent;
+	overflow-y: auto;
+	flex: 1;
+	min-height: 0;
 }
 
 .gemini-rag-chat-empty {
-  font-size: 12px;
-  opacity: 0.7;
+	font-size: 12px;
+	opacity: 0.7;
 }
 
 .gemini-rag-chat-bubble {
-  padding: 8px 10px;
-  border-radius: 8px;
-  border: 1px solid var(--background-modifier-border);
+	padding: 8px 10px;
+	border-radius: 8px;
+	border: 1px solid var(--background-modifier-border);
 }
 
 .gemini-rag-chat-bubble.user {
-  background: var(--interactive-accent);
-  color: var(--text-on-accent);
-  align-self: flex-end;
-  max-width: 72%;
-  border: none;
-  border-radius: 18px;
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+	align-self: flex-end;
+	max-width: 72%;
+	border: none;
+	border-radius: 18px;
 }
 
 .gemini-rag-chat-bubble.assistant {
-  background: transparent;
-  border: none;
-  padding: 0;
-  align-self: stretch;
+	background: transparent;
+	border: none;
+	padding: 0;
+	align-self: stretch;
 }
 
 .gemini-rag-chat-role {
-  font-size: 11px;
-  opacity: 0.6;
-  margin-bottom: 4px;
+	font-size: 11px;
+	opacity: 0.6;
+	margin-bottom: 4px;
 }
 
 .gemini-rag-chat-text {
-  font-size: 13px;
-  line-height: 1.6;
+	font-size: 13px;
+	line-height: 1.6;
 }
 
 .gemini-rag-chat-text a[href^="citation:"] {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 6px;
-  margin-left: 4px;
-  border-radius: 999px;
-  font-size: 11px;
-  line-height: 1;
-  color: var(--text-on-accent);
-  background: var(--interactive-accent);
-  text-decoration: none;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-width: 18px;
+	height: 18px;
+	padding: 0 6px;
+	margin-left: 4px;
+	border-radius: 999px;
+	font-size: 11px;
+	line-height: 1;
+	color: var(--text-on-accent);
+	background: var(--interactive-accent);
+	text-decoration: none;
 }
 
 .gemini-rag-chat-text a[href^="citation:"]:hover {
-  opacity: 0.9;
+	opacity: 0.9;
 }
 
 .gemini-rag-label {
-  font-size: 13px;
-  font-weight: 600;
+	font-size: 13px;
+	font-weight: 600;
 }
 
 .gemini-rag-input {
-  width: 100%;
-  min-height: 110px;
-  resize: vertical;
-  padding: 10px 12px;
-  border-radius: 6px;
-  border: 1px solid var(--background-modifier-border);
-  background: var(--background-primary);
+	width: 100%;
+	min-height: 110px;
+	resize: vertical;
+	padding: 10px 12px;
+	border-radius: 6px;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-primary);
 }
 
 .gemini-rag-hint {
-  font-size: 11px;
-  opacity: 0.7;
+	font-size: 11px;
+	opacity: 0.7;
 }
 
 .gemini-rag-buttons {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
 }
 
 .gemini-rag-btn {
-  border-radius: 6px;
-  padding: 6px 12px;
-  border: 1px solid var(--background-modifier-border);
-  background: var(--background-primary);
+	border-radius: 6px;
+	padding: 6px 12px;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-primary);
 }
 
 .gemini-rag-btn.is-primary {
-  background: var(--interactive-accent);
-  color: var(--text-on-accent);
-  border-color: transparent;
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+	border-color: transparent;
 }
 
 .gemini-rag-answer,
 .gemini-rag-sources {
-  font-size: 13px;
-  line-height: 1.6;
+	font-size: 13px;
+	line-height: 1.6;
 }
 
 .gemini-rag-answer-body :is(h1, h2, h3, h4, h5, h6) {
-  margin: 0.8em 0 0.4em;
+	margin: 0.8em 0 0.4em;
 }
 
 .gemini-rag-answer-body pre {
-  padding: 8px;
-  border-radius: 6px;
-  background: var(--background-secondary);
+	padding: 8px;
+	border-radius: 6px;
+	background: var(--background-secondary);
 }
 
 .gemini-rag-sources-section {
-  border: 1px solid var(--background-modifier-border);
-  border-radius: 10px;
-  padding: 8px 10px;
-  background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	border-radius: 10px;
+	padding: 8px 10px;
+	background: var(--background-primary);
 }
 
 .gemini-rag-sources-section > summary {
-  cursor: pointer;
-  font-size: 12px;
-  opacity: 0.7;
-  list-style: none;
+	cursor: pointer;
+	font-size: 12px;
+	opacity: 0.7;
+	list-style: none;
 }
 
 .gemini-rag-sources-section > summary::-webkit-details-marker {
-  display: none;
+	display: none;
 }
 
 .gemini-rag-sources ol {
-  margin: 0;
-  padding-left: 20px;
+	margin: 0;
+	padding-left: 20px;
 }
 
 .gemini-rag-source-item {
-  border-radius: 6px;
-  padding: 2px 4px;
+	border-radius: 6px;
+	padding: 2px 4px;
 }
 
 .gemini-rag-source-item.is-active {
-  background: var(--background-secondary);
+	background: var(--background-secondary);
 }
 
 .gemini-rag-source-link {
-  cursor: pointer;
-  color: var(--text-accent);
-  text-decoration: none;
+	cursor: pointer;
+	color: var(--text-accent);
+	text-decoration: none;
 }
 
 .gemini-rag-source-link:hover {
-  text-decoration: underline;
+	text-decoration: underline;
+}
+
+/* Citation tooltip */
+.gemini-rag-tooltip {
+	position: fixed;
+	z-index: 1000;
+	max-width: 320px;
+	padding: 10px 12px;
+	border-radius: 8px;
+	background: var(--background-primary);
+	border: 1px solid var(--background-modifier-border);
+	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+	font-size: 12px;
+	line-height: 1.5;
+	pointer-events: none;
+	animation: gemini-tooltip-fade 0.15s ease;
+}
+
+@keyframes gemini-tooltip-fade {
+	from {
+		opacity: 0;
+		transform: translateY(4px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+.gemini-rag-tooltip-header {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	margin-bottom: 6px;
+	font-weight: 600;
+}
+
+.gemini-rag-tooltip-icon {
+	font-size: 14px;
+}
+
+.gemini-rag-tooltip-title {
+	color: var(--text-accent);
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.gemini-rag-tooltip-body {
+	color: var(--text-muted);
+	overflow: hidden;
+	display: -webkit-box;
+	-webkit-line-clamp: 4;
+	-webkit-box-orient: vertical;
 }

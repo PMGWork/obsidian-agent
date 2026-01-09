@@ -1,6 +1,7 @@
 import ObsidianRagPlugin from "../main";
-import { RAG_VIEW_TYPE } from "../ui/rag_view";
+import { RAG_VIEW_TYPE } from "../ui/chat_view";
 
+// パネルを開くコマンド
 export async function openRagPanel(plugin: ObsidianRagPlugin) {
   const { workspace } = plugin.app;
   let leaf: import("obsidian").WorkspaceLeaf | undefined = workspace.getLeavesOfType(RAG_VIEW_TYPE)[0];

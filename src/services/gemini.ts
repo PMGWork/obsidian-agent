@@ -1,3 +1,5 @@
+import { requestUrl, RequestUrlParam } from "obsidian";
+
 type FileSearchStore = {
   name?: string;
   displayName?: string;
@@ -54,10 +56,10 @@ export class GeminiClient {
     payload: {
       displayName: string;
       bytes: Uint8Array;
-      chunking?: { maxTokensPerChunk: number; maxOverlapTokens: number } | null;
       metadata?: Array<{ key: string; stringValue?: string; numericValue?: number }>;
     }
   ): Promise<UploadOperation> {
+    // eslint-disable-next-line no-restricted-globals -- Resumable upload requires special headers not supported by requestUrl
     const startResponse = await fetch(
       `${UPLOAD_BASE_URL}/${storeName}:uploadToFileSearchStore`,
       {
@@ -73,14 +75,6 @@ export class GeminiClient {
         body: JSON.stringify({
           displayName: payload.displayName,
           mimeType: "text/markdown",
-          chunkingConfig: payload.chunking
-            ? {
-                whiteSpaceConfig: {
-                  maxTokensPerChunk: payload.chunking.maxTokensPerChunk,
-                  maxOverlapTokens: payload.chunking.maxOverlapTokens,
-                },
-              }
-            : undefined,
           customMetadata: payload.metadata,
         }),
       }
@@ -95,13 +89,14 @@ export class GeminiClient {
       throw new Error("Upload URL missing from response.");
     }
 
+    // eslint-disable-next-line no-restricted-globals -- Resumable upload requires special headers not supported by requestUrl
     const uploadResponse = await fetch(uploadUrl, {
       method: "POST",
       headers: {
         "X-Goog-Upload-Command": "upload, finalize",
         "X-Goog-Upload-Offset": "0",
       },
-      body: payload.bytes,
+      body: new Blob([payload.bytes.slice().buffer], { type: "text/markdown" }),
     });
 
     if (!uploadResponse.ok) {
@@ -132,7 +127,6 @@ export class GeminiClient {
     model: string,
     storeName: string,
     question: string,
-    metadataFilter?: string,
     includeThoughts?: boolean
   ): Promise<GenerateContentResponse> {
     return (await this.request(`${BASE_URL}/models/${model}:generateContent`, {
@@ -143,7 +137,6 @@ export class GeminiClient {
           {
             fileSearch: {
               fileSearchStoreNames: [storeName],
-              metadataFilter: metadataFilter || undefined,
             },
           },
         ],
@@ -184,22 +177,25 @@ export class GeminiClient {
     return { text, grounding, thoughtSummary: thoughtSummary || undefined };
   }
 
-  private async request(url: string, init: RequestInit): Promise<unknown> {
-    const response = await fetch(url, {
-      ...init,
+  private async request(url: string, init: { method: string; body?: string }): Promise<unknown> {
+    const params: RequestUrlParam = {
+      url,
+      method: init.method,
       headers: {
         "x-goog-api-key": this.apiKey,
         "Content-Type": "application/json",
-        ...(init.headers ?? {}),
       },
-    });
-    if (!response.ok) {
-      throw new Error(await response.text());
+      body: init.body,
+      throw: false,
+    };
+    const response = await requestUrl(params);
+    if (response.status >= 400) {
+      throw new Error(response.text);
     }
     if (response.status === 204) {
       return {};
     }
-    return response.json();
+    return response.json;
   }
 
   private async delay(ms: number): Promise<void> {

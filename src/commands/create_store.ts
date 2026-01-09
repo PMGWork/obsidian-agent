@@ -2,6 +2,7 @@ import { Notice } from "obsidian";
 import ObsidianRagPlugin from "../main";
 import { GeminiClient } from "../services/gemini";
 
+// Storeを作成するコマンド
 export async function createStoreCommand(plugin: ObsidianRagPlugin) {
   const apiKey = plugin.settings.apiKey;
   if (!apiKey) {

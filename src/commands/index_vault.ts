@@ -12,6 +12,7 @@ function getMtime(file: TFile): number {
   return file.stat?.mtime ?? 0;
 }
 
+// Vaultをインデックスするコマンド
 export async function indexVaultCommand(plugin: ObsidianRagPlugin) {
   const apiKey = plugin.settings.apiKey;
   const storeName = plugin.settings.storeName;
@@ -20,7 +21,7 @@ export async function indexVaultCommand(plugin: ObsidianRagPlugin) {
     return;
   }
   if (!storeName) {
-    new Notice("File Search store name is not set.");
+    new Notice("File search store name is not set.");
     return;
   }
 
@@ -65,6 +66,7 @@ export async function indexVaultCommand(plugin: ObsidianRagPlugin) {
   new Notice(`Index complete. Indexed ${progress.indexed}, skipped ${progress.skipped}.`);
 }
 
+// ファイルをインデックスする
 async function indexFile(
   plugin: ObsidianRagPlugin,
   client: GeminiClient,
@@ -77,12 +79,6 @@ async function indexFile(
   if (bytes.byteLength > 100 * 1024 * 1024) {
     throw new Error(`File too large: ${file.path}`);
   }
-  const chunking = plugin.settings.chunkingEnabled
-    ? {
-        maxTokensPerChunk: plugin.settings.maxTokensPerChunk,
-        maxOverlapTokens: plugin.settings.maxOverlapTokens,
-      }
-    : null;
 
   const metadata = [
     { key: "vault", stringValue: plugin.app.vault.getName() },
@@ -93,7 +89,6 @@ async function indexFile(
   const operation = await client.uploadMarkdownToStore(storeName, {
     displayName: file.path,
     bytes,
-    chunking,
     metadata,
   });
   return operation;
