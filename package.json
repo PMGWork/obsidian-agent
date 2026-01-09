@@ -1,6 +1,6 @@
 {
 	"name": "obsidian-agent",
-	"version": "0.1.9",
+	"version": "0.1.10",
 	"description": "This is a sample plugin for Obsidian (https://obsidian.md)",
 	"main": "main.js",
 	"type": "module",
