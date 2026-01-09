@@ -50,7 +50,7 @@ export class RagView extends ItemView {
       cls: "gemini-rag-icon-btn",
       attr: { "aria-label": "New chat", title: "New chat" },
     });
-    setIcon(newChatButton, "circle-plus");
+    setIcon(newChatButton, "plus-circle");
 
     const main = contentEl.createEl("div", { cls: "gemini-rag-main" });
     this.chatEl = main.createEl("div", { cls: "gemini-rag-chat" });
@@ -177,6 +177,12 @@ export class RagView extends ItemView {
       let combinedGrounding: GroundingMetadata | undefined;
 
       if (!this.chatEl) return;
+
+      // User bubble
+      const userBubble = this.chatEl.createEl("div", { cls: "gemini-rag-chat-bubble user" });
+      userBubble.createEl("div", { cls: "gemini-rag-chat-text", text: question });
+      this.scrollToBottom();
+
       // Create placeholders
       const assistantBubble = this.chatEl.createEl("div", { cls: "gemini-rag-chat-bubble assistant" });
       const answerEl = assistantBubble.createEl("div", { cls: "gemini-rag-chat-text" });
@@ -205,7 +211,7 @@ export class RagView extends ItemView {
           combinedGrounding,
           extractSources(combinedGrounding, () => "") // Temporary source resolution
         );
-        const output = this.formatOutput(annotatedText, fullThought);
+        const output = this.formatOutput(annotatedText, fullThought, false);
 
         answerEl.empty();
         await MarkdownRenderer.render(
@@ -215,6 +221,7 @@ export class RagView extends ItemView {
           this.plugin.app.vault.getRoot().path,
           this
         );
+        this.scrollToBottom();
       }, history, true);
 
       // Final render with correct links
@@ -224,7 +231,7 @@ export class RagView extends ItemView {
         this.sourcesMap.set(source.index, source);
       }
       const finalAnnotatedText = annotateAnswer(fullText, combinedGrounding, sources);
-      const finalOutput = this.formatOutput(finalAnnotatedText, fullThought);
+      const finalOutput = this.formatOutput(finalAnnotatedText, fullThought, true);
 
       answerEl.empty();
       await MarkdownRenderer.render(
@@ -235,6 +242,7 @@ export class RagView extends ItemView {
         this
       );
 
+      this.scrollToBottom();
       this.pushHistory(question, finalOutput);
 
     } catch (error) {
@@ -246,20 +254,42 @@ export class RagView extends ItemView {
   }
 
   // 出力をフォーマットする
-  private formatOutput(answer: string, thoughtSummary?: string): string {
-    const title = "推論の要約";
-    const summary = thoughtSummary?.trim();
-    if (!summary) {
-      return answer;
+  private formatOutput(answer: string, thoughtSummary?: string, isFinal = false): string {
+    let title = "Thinking...";
+    if (isFinal) {
+      title = "推論完了";
+    } else if (thoughtSummary) {
+      title = this.getLatestThoughtTitle(thoughtSummary);
     }
 
-    // Callout syntax for Obsidian
-    const callout = `> [!info]- ${title}\n> ${summary.replace(/\n/g, "\n> ")}`;
+    const callout = `> [!info] ${title}`;
 
     if (!answer.trim()) {
       return callout;
     }
     return `${callout}\n\n${answer}`;
+  }
+
+  // 最新の思考内容からタイトルを生成する
+  private getLatestThoughtTitle(fullThought: string): string {
+    if (!fullThought) return "Thinking...";
+
+    const lines = fullThought.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
+    const lastLine = lines[lines.length - 1];
+
+    if (!lastLine) return "Thinking...";
+
+    // 見出し記号などを削除
+    const cleanLine = lastLine
+      .replace(/^#+\s*/, "")
+      .replace(/^[-*]\s+/, "")
+      .replace(/^>\s+/, "");
+
+    const maxLength = 50;
+    if (cleanLine.length > maxLength) {
+      return cleanLine.substring(0, maxLength) + "...";
+    }
+    return cleanLine;
   }
 
   // 履歴に追加する
@@ -301,6 +331,7 @@ export class RagView extends ItemView {
         this
       );
     }
+    this.scrollToBottom();
   }
 
   // ツールチップを表示する
@@ -346,6 +377,14 @@ export class RagView extends ItemView {
     if (this.tooltipEl) {
       this.tooltipEl.remove();
       this.tooltipEl = undefined;
+    }
+  }
+
+
+  // 最下部へスクロール
+  private scrollToBottom() {
+    if (this.chatEl) {
+      this.chatEl.scrollTop = this.chatEl.scrollHeight;
     }
   }
 }
