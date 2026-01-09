@@ -2,7 +2,7 @@
 
 import { ItemView, Notice, WorkspaceLeaf, MarkdownRenderer, setIcon } from "obsidian";
 import ObsidianRagPlugin from "../main";
-import { GeminiClient } from "../services/gemini";
+import { GeminiClient, type GroundingMetadata } from "../services/gemini";
 import { indexVaultCommand } from "../commands/index_vault";
 import { createStoreCommand } from "../commands/create_store";
 import { SourceItem, extractSources, annotateAnswer } from "../utils/grounding";
@@ -13,8 +13,6 @@ export const RAG_VIEW_TYPE = "gemini-file-search-rag-view";
 // チャットビュークラス
 export class RagView extends ItemView {
   private plugin: ObsidianRagPlugin;
-  private cleanupStatus?: () => void;
-  private statusEl?: HTMLElement;
   private hintEl?: HTMLElement;
   private chatEl?: HTMLElement;
   private sourcesMap = new Map<number, SourceItem>();
@@ -35,22 +33,6 @@ export class RagView extends ItemView {
 
   async onOpen(): Promise<void> {
     this.render();
-    this.cleanupStatus = this.plugin.onStatusChange((message) => {
-      if (this.statusEl) {
-        this.statusEl.setText(message);
-        if (message) {
-          this.statusEl.addClass("is-active");
-        } else {
-          this.statusEl.removeClass("is-active");
-        }
-      }
-    });
-  }
-
-  async onClose(): Promise<void> {
-    if (this.cleanupStatus) {
-      this.cleanupStatus();
-    }
   }
 
   // UIを描画する
@@ -63,12 +45,12 @@ export class RagView extends ItemView {
     const titleWrap = header.createEl("div", { cls: "gemini-rag-title-wrap" });
     titleWrap.createEl("h2", { text: "Obsidian agent" });
     const headerActions = header.createEl("div", { cls: "gemini-rag-header-actions" });
-    this.statusEl = headerActions.createEl("div", { cls: "gemini-rag-status-pill" });
+
     const newChatButton = headerActions.createEl("button", {
       cls: "gemini-rag-icon-btn",
       attr: { "aria-label": "New chat", title: "New chat" },
     });
-    setIcon(newChatButton, "plus");
+    setIcon(newChatButton, "circle-plus");
 
     const main = contentEl.createEl("div", { cls: "gemini-rag-main" });
     this.chatEl = main.createEl("div", { cls: "gemini-rag-chat" });
@@ -133,6 +115,7 @@ export class RagView extends ItemView {
       if (!question) {
         return;
       }
+      input.value = "";
       await this.ask(question);
     };
 
@@ -186,39 +169,79 @@ export class RagView extends ItemView {
     const client = new GeminiClient(apiKey);
     try {
       this.plugin.setStatus("Generating answer...");
-      if (this.statusEl) {
-        this.statusEl.setText("Thinking...");
-        this.statusEl.addClass("is-active");
-      }
 
+      const history = this.plugin.history.slice(-10);
 
-      const response = await client.generateContent(
-        model,
-        storeName,
-        question,
-        true
-      );
-      const { text, grounding, thoughtSummary } = client.extractAnswer(response);
-      const sources = extractSources(grounding, (title) => resolveVaultPath(this.app, title));
+      let fullText = "";
+      let fullThought = "";
+      let combinedGrounding: GroundingMetadata | undefined;
+
+      if (!this.chatEl) return;
+      // Create placeholders
+      const assistantBubble = this.chatEl.createEl("div", { cls: "gemini-rag-chat-bubble assistant" });
+      const answerEl = assistantBubble.createEl("div", { cls: "gemini-rag-chat-text" });
+
+      await client.generateContentStream(model, storeName, question, async (chunk) => {
+        const { text, grounding, thoughtSummary } = client.extractAnswer(chunk);
+        if (text) fullText += text;
+        if (thoughtSummary) fullThought += thoughtSummary;
+        if (grounding) {
+          combinedGrounding = {
+            ...combinedGrounding,
+            ...grounding,
+            groundingChunks: [
+              ...(combinedGrounding?.groundingChunks ?? []),
+              ...(grounding.groundingChunks ?? []),
+            ],
+            groundingSupports: [
+              ...(combinedGrounding?.groundingSupports ?? []),
+              ...(grounding.groundingSupports ?? []),
+            ],
+          };
+        }
+
+        const annotatedText = annotateAnswer(
+          fullText,
+          combinedGrounding,
+          extractSources(combinedGrounding, () => "") // Temporary source resolution
+        );
+        const output = this.formatOutput(annotatedText, fullThought);
+
+        answerEl.empty();
+        await MarkdownRenderer.render(
+          this.plugin.app,
+          output,
+          answerEl,
+          this.plugin.app.vault.getRoot().path,
+          this
+        );
+      }, history, true);
+
+      // Final render with correct links
+      const sources = extractSources(combinedGrounding, (title) => resolveVaultPath(this.app, title));
       this.sourcesMap.clear();
       for (const source of sources) {
         this.sourcesMap.set(source.index, source);
       }
-      const annotatedText = annotateAnswer(text, grounding, sources);
-      const output = this.formatOutput(annotatedText, thoughtSummary);
-      this.pushHistory(question, output);
-      this.renderHistory();
+      const finalAnnotatedText = annotateAnswer(fullText, combinedGrounding, sources);
+      const finalOutput = this.formatOutput(finalAnnotatedText, fullThought);
 
+      answerEl.empty();
+      await MarkdownRenderer.render(
+        this.plugin.app,
+        finalOutput,
+        answerEl,
+        this.plugin.app.vault.getRoot().path,
+        this
+      );
+
+      this.pushHistory(question, finalOutput);
 
     } catch (error) {
       console.error(error);
       new Notice("Failed to generate answer. Check console for details.");
     } finally {
       this.plugin.setStatus("");
-      if (this.statusEl) {
-        this.statusEl.setText("");
-        this.statusEl.removeClass("is-active");
-      }
     }
   }
 
@@ -229,10 +252,14 @@ export class RagView extends ItemView {
     if (!summary) {
       return answer;
     }
+
+    // Callout syntax for Obsidian
+    const callout = `> [!info]- ${title}\n> ${summary.replace(/\n/g, "\n> ")}`;
+
     if (!answer.trim()) {
-      return `**${title}**\n\n${summary}`;
+      return callout;
     }
-    return `**${title}**\n\n${summary}\n\n${answer}`;
+    return `${callout}\n\n${answer}`;
   }
 
   // 履歴に追加する

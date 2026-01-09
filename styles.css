@@ -40,24 +40,6 @@ If your plugin does not need CSS, delete this file.
 	font-size: 18px;
 }
 
-.gemini-rag-status-pill {
-	min-height: 22px;
-	padding: 2px 10px;
-	border-radius: 999px;
-	background: transparent;
-	font-size: 11px;
-	align-self: center;
-	opacity: 0;
-	transition: opacity 0.2s ease;
-	border: 1px solid transparent;
-}
-
-.gemini-rag-status-pill.is-active {
-	opacity: 1;
-	border-color: var(--background-modifier-border);
-	background: var(--background-secondary);
-}
-
 .gemini-rag-icon-btn {
 	width: 28px;
 	height: 28px;
@@ -68,6 +50,7 @@ If your plugin does not need CSS, delete this file.
 	align-items: center;
 	justify-content: center;
 	cursor: pointer;
+	color: var(--text-muted);
 }
 
 .gemini-rag-icon-btn:hover {
