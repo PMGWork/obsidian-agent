@@ -46,9 +46,13 @@ export class RagSettingTab extends PluginSettingTab {
 
     new Setting(containerEl)
       .setName("Model")
-      .setDesc("Model used for answering queries.")
-      .addText((text) =>
-        text
+      .setDesc("Select the model used for answers.")
+      .addDropdown((dropdown) =>
+        dropdown
+          .addOption("gemini-2.5-flash", "Gemini 2.5 flash")
+          .addOption("gemini-2.5-pro", "Gemini 2.5 pro")
+          .addOption("gemini-3-flash-preview", "Gemini 3 flash preview")
+          .addOption("gemini-3-pro-preview", "Gemini 3 pro preview")
           .setValue(this.plugin.settings.model)
           .onChange(async (value) => {
             this.plugin.settings.model = value.trim();

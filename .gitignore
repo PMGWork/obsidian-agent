@@ -14,9 +14,6 @@ node_modules
 # obsidian
 data.json
 
-# Build outputs
-styles.css
-
 # Environment variables
 .env
 

@@ -67,7 +67,8 @@ export class GeminiClient {
       displayName: string;
       bytes: Uint8Array;
       metadata?: Array<{ key: string; stringValue?: string; numericValue?: number }>;
-    }
+    },
+    signal?: AbortSignal
   ): Promise<UploadOperation> {
     // eslint-disable-next-line no-restricted-globals -- Resumable upload requires special headers not supported by requestUrl
     const startResponse = await fetch(
@@ -87,6 +88,7 @@ export class GeminiClient {
           mimeType: "text/markdown",
           customMetadata: payload.metadata,
         }),
+        signal,
       }
     );
 
@@ -107,6 +109,7 @@ export class GeminiClient {
         "X-Goog-Upload-Offset": "0",
       },
       body: new Blob([payload.bytes.slice().buffer], { type: "text/markdown" }),
+      signal,
     });
 
     if (!uploadResponse.ok) {
@@ -117,9 +120,12 @@ export class GeminiClient {
   }
 
   // 操作の待機
-  async waitForOperation(name: string, timeoutMs = 120000): Promise<void> {
+  async waitForOperation(name: string, timeoutMs = 120000, signal?: AbortSignal): Promise<void> {
     const started = Date.now();
     while (Date.now() - started < timeoutMs) {
+      if (signal?.aborted) {
+        throw new Error("Indexing cancelled.");
+      }
       const operation = (await this.request(`${BASE_URL}/${name}`, {
         method: "GET",
       })) as UploadOperation;
@@ -193,8 +199,15 @@ export class GeminiClient {
       buffer = lines.pop() ?? "";
 
       for (const line of lines) {
-        if (line.startsWith("data: ")) {
-          const jsonText = line.slice(6);
+        const trimmed = line.replace(/\r$/, "").trim();
+        if (!trimmed.startsWith("data:")) {
+          continue;
+        }
+        const jsonText = trimmed.slice(5).trimStart();
+        if (!jsonText || jsonText === "[DONE]") {
+          continue;
+        }
+        if (jsonText) {
           try {
             const json = JSON.parse(jsonText) as GenerateContentResponse;
             await onChunk(json);
