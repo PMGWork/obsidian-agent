@@ -16,8 +16,6 @@ function buildStatusMessage(state: IndexProgressState): string {
   switch (state.status) {
     case "running":
       return `Indexing ${summary}`;
-    case "paused":
-      return `Index paused at ${summary}`;
     case "cancelling":
       return "Cancelling index...";
     case "completed":
@@ -75,7 +73,6 @@ export async function indexVaultCommand(plugin: ObsidianRagPlugin) {
 
   try {
     for (const file of files) {
-      await indexer.waitIfPaused();
       if (indexer.isCancelled()) {
         break;
       }

@@ -27,7 +27,6 @@ export class RagView extends ItemView {
   private indexFailuresEl?: HTMLElement;
   private indexControls?: {
     indexButton: HTMLButtonElement;
-    pauseButton: HTMLButtonElement;
     cancelButton: HTMLButtonElement;
   };
 
@@ -63,9 +62,20 @@ export class RagView extends ItemView {
     this.indexUnsub?.();
 
     const header = contentEl.createEl("div", { cls: "gemini-rag-header" });
-    const titleWrap = header.createEl("div", { cls: "gemini-rag-title-wrap" });
-    titleWrap.createEl("h2", { text: "Obsidian agent" });
+    const headerLeft = header.createEl("div", { cls: "gemini-rag-header-left" });
     const headerActions = header.createEl("div", { cls: "gemini-rag-header-actions" });
+
+    const settingsButton = headerLeft.createEl("button", {
+      cls: "gemini-rag-icon-btn",
+      attr: { "aria-label": "Settings", title: "Settings" },
+    });
+    setIcon(settingsButton, "settings");
+
+    const createIndexButton = headerLeft.createEl("button", {
+      cls: "gemini-rag-icon-btn",
+      attr: { "aria-label": "Create index", title: "Create index" },
+    });
+    setIcon(createIndexButton, "database");
 
     const newChatButton = headerActions.createEl("button", {
       cls: "gemini-rag-icon-btn",
@@ -74,7 +84,8 @@ export class RagView extends ItemView {
     setIcon(newChatButton, "plus-circle");
 
     const main = contentEl.createEl("div", { cls: "gemini-rag-main" });
-    this.chatEl = main.createEl("div", { cls: "gemini-rag-chat" });
+    const chatWrap = main.createEl("div", { cls: "gemini-rag-chat-wrap" });
+    this.chatEl = chatWrap.createEl("div", { cls: "gemini-rag-chat" });
     this.chatEl.addEventListener("click", (event) => {
       const target = event.target as HTMLElement | null;
       if (!target) return;
@@ -129,12 +140,10 @@ export class RagView extends ItemView {
     const buttons = controls.createEl("div", { cls: "gemini-rag-buttons" });
     const askButton = buttons.createEl("button", { cls: "gemini-rag-btn is-primary", text: "Ask" });
     const indexButton = buttons.createEl("button", { cls: "gemini-rag-btn", text: "Index vault" });
-    const pauseButton = buttons.createEl("button", { cls: "gemini-rag-btn", text: "Pause" });
     const cancelButton = buttons.createEl("button", { cls: "gemini-rag-btn", text: "Cancel" });
-    const storeButton = buttons.createEl("button", { cls: "gemini-rag-btn", text: "Create store" });
-    this.indexControls = { indexButton, pauseButton, cancelButton };
+    this.indexControls = { indexButton, cancelButton };
 
-    const progress = contentEl.createEl("div", { cls: "gemini-rag-progress" });
+    const progress = chatWrap.createEl("div", { cls: "gemini-rag-progress" });
     this.indexProgressEl = progress;
     this.indexSummaryEl = progress.createEl("div", { cls: "gemini-rag-progress-summary" });
     this.indexCurrentEl = progress.createEl("div", { cls: "gemini-rag-progress-current" });
@@ -163,6 +172,17 @@ export class RagView extends ItemView {
       await this.ask(question);
     };
 
+    settingsButton.addEventListener("click", () => {
+      const appSetting = (this.app as { setting?: { open: () => void; openTabById: (id: string) => void } }).setting;
+      if (!appSetting) return;
+      appSetting.open();
+      appSetting.openTabById(this.plugin.manifest.id);
+    });
+
+    createIndexButton.addEventListener("click", () => {
+      void createStoreCommand(this.plugin);
+    });
+
     newChatButton.addEventListener("click", () => {
       void this.clearChat();
     });
@@ -181,13 +201,6 @@ export class RagView extends ItemView {
       void indexVaultCommand(this.plugin);
     });
 
-    pauseButton.addEventListener("click", () => {
-      const updated = this.plugin.indexing.togglePause();
-      if (!updated) {
-        new Notice("No indexing task running.");
-      }
-    });
-
     cancelButton.addEventListener("click", () => {
       const cancelled = this.plugin.indexing.requestCancel();
       if (!cancelled) {
@@ -195,9 +208,6 @@ export class RagView extends ItemView {
       }
     });
 
-    storeButton.addEventListener("click", () => {
-      void createStoreCommand(this.plugin);
-    });
   }
 
   // チャットをクリアする
@@ -403,7 +413,7 @@ export class RagView extends ItemView {
       return;
     }
 
-    const isActive = state.status !== "idle";
+    const isActive = state.status === "running";
     this.indexProgressEl.style.display = isActive ? "flex" : "none";
 
     const summaryParts = [
@@ -416,9 +426,6 @@ export class RagView extends ItemView {
     switch (state.status) {
       case "running":
         statusText = "Indexing";
-        break;
-      case "paused":
-        statusText = "Index paused";
         break;
       case "cancelling":
         statusText = "Cancelling";
@@ -457,13 +464,10 @@ export class RagView extends ItemView {
     }
 
     const isRunning = state.status === "running";
-    const isPaused = state.status === "paused";
     const isCancelling = state.status === "cancelling";
 
-    this.indexControls.indexButton.disabled = isRunning || isPaused || isCancelling;
-    this.indexControls.pauseButton.disabled = !(isRunning || isPaused);
-    this.indexControls.cancelButton.disabled = !(isRunning || isPaused);
-    this.indexControls.pauseButton.setText(isPaused ? "Resume" : "Pause");
+    this.indexControls.indexButton.disabled = isRunning || isCancelling;
+    this.indexControls.cancelButton.disabled = !(isRunning || isCancelling);
   }
 
   // ツールチップを表示する

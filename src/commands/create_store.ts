@@ -18,7 +18,7 @@ export async function createStoreCommand(plugin: ObsidianRagPlugin) {
       const confirmed = await confirmAction(plugin.app, {
         title: "Delete existing store?",
         message:
-          "This deletes the current File Search store and its remote documents. This cannot be undone.",
+          "This deletes the current file search store and its remote documents. This cannot be undone.",
         confirmText: "Delete",
         cancelText: "Cancel",
       });
@@ -26,10 +26,10 @@ export async function createStoreCommand(plugin: ObsidianRagPlugin) {
         plugin.setStatus("");
         return;
       }
-      plugin.setStatus("Deleting existing File Search store...");
+      plugin.setStatus("Deleting existing file search store...");
       await client.deleteFileSearchStore(plugin.settings.storeName, true);
     }
-    plugin.setStatus("Creating File Search store...");
+    plugin.setStatus("Creating file search store...");
     const store = await client.createFileSearchStore(displayName);
     plugin.settings.storeName = store.name ?? "";
     await plugin.resetIndexStateForStore(plugin.settings.storeName);

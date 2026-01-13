@@ -8,10 +8,6 @@
 # npm
 node_modules
 
-# Don't include the compiled main.js file in the repo.
-# They should be uploaded to GitHub releases instead.
-# main.js  # Commented out for BRAT compatibility
-
 # Exclude sourcemaps
 *.map
 
@@ -29,3 +25,6 @@ styles.css
 
 # Exclude macOS Finder (System Explorer) View States
 .DS_Store
+
+# Build
+main.js

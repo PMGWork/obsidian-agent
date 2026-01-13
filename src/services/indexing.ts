@@ -3,7 +3,6 @@
 export type IndexStatus =
   | "idle"
   | "running"
-  | "paused"
   | "cancelling"
   | "cancelled"
   | "completed"
@@ -35,8 +34,6 @@ export class IndexingController {
   };
   private listeners = new Set<(state: IndexProgressState) => void>();
   private cancelRequested = false;
-  private pauseRequested = false;
-  private pauseResolvers: Array<() => void> = [];
 
   onChange(listener: (state: IndexProgressState) => void): () => void {
     this.listeners.add(listener);
@@ -54,7 +51,7 @@ export class IndexingController {
   }
 
   isRunning(): boolean {
-    return ["running", "paused", "cancelling"].includes(this.state.status);
+    return ["running", "cancelling"].includes(this.state.status);
   }
 
   isCancelled(): boolean {
@@ -63,8 +60,6 @@ export class IndexingController {
 
   start(total: number): void {
     this.cancelRequested = false;
-    this.pauseRequested = false;
-    this.pauseResolvers = [];
     this.state = {
       status: "running",
       total,
@@ -115,57 +110,22 @@ export class IndexingController {
       return false;
     }
     this.cancelRequested = true;
-    this.pauseRequested = false;
-    this.resolvePause();
     this.setStatus("cancelling");
     return true;
   }
 
-  togglePause(): boolean {
-    if (!this.isRunning()) {
-      return false;
-    }
-    if (this.state.status === "paused") {
-      this.pauseRequested = false;
-      this.resolvePause();
-      this.setStatus("running");
-      return true;
-    }
-    if (this.state.status === "running") {
-      this.pauseRequested = true;
-      this.setStatus("paused");
-      return true;
-    }
-    return false;
-  }
-
-  async waitIfPaused(): Promise<void> {
-    if (!this.pauseRequested) {
-      return;
-    }
-    await new Promise<void>((resolve) => {
-      this.pauseResolvers.push(resolve);
-    });
-  }
-
   finishCompleted(): void {
     this.cancelRequested = false;
-    this.pauseRequested = false;
-    this.resolvePause();
     this.setStatus("completed");
   }
 
   finishCancelled(): void {
     this.cancelRequested = false;
-    this.pauseRequested = false;
-    this.resolvePause();
     this.setStatus("cancelled");
   }
 
   finishError(): void {
     this.cancelRequested = false;
-    this.pauseRequested = false;
-    this.resolvePause();
     this.setStatus("error");
   }
 
@@ -179,14 +139,6 @@ export class IndexingController {
           : this.state.currentFile,
     };
     this.notify();
-  }
-
-  private resolvePause(): void {
-    const resolvers = [...this.pauseResolvers];
-    this.pauseResolvers = [];
-    for (const resolver of resolvers) {
-      resolver();
-    }
   }
 
   private notify(): void {
