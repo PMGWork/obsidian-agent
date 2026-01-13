@@ -105,15 +105,47 @@ If your plugin does not need CSS, delete this file.
 	z-index: 2;
 }
 
+.gemini-rag-progress-top {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 8px;
+}
+
+.gemini-rag-progress-percent {
+	font-weight: 600;
+	font-size: 12px;
+	color: var(--text-muted);
+	white-space: nowrap;
+}
+
+.gemini-rag-progress-bar {
+	height: 6px;
+	border-radius: 999px;
+	background: var(--background-secondary);
+	overflow: hidden;
+}
+
+.gemini-rag-progress-bar-fill {
+	height: 100%;
+	width: 0%;
+	background: var(--interactive-accent);
+	transition: width 140ms ease-out;
+}
+
 .gemini-rag-progress-current {
 	font-size: 11px;
 	color: var(--text-muted);
-	word-break: break-all;
+	word-break: break-word;
 }
 
 .gemini-rag-progress-failures {
 	font-size: 11px;
 	color: var(--text-muted);
+}
+
+.gemini-rag-progress-failures-details summary {
+	cursor: pointer;
 }
 
 .gemini-rag-progress-failures ul {

@@ -20,6 +20,8 @@ export class RagView extends ItemView {
   private indexUnsub?: () => void;
   private indexProgressEl?: HTMLElement;
   private indexSummaryEl?: HTMLElement;
+  private indexPercentEl?: HTMLElement;
+  private indexBarFillEl?: HTMLElement;
   private indexCurrentEl?: HTMLElement;
   private indexFailuresEl?: HTMLElement;
   private indexControls?: {
@@ -145,7 +147,11 @@ export class RagView extends ItemView {
 
     const progress = chatWrap.createEl("div", { cls: "gemini-rag-progress" });
     this.indexProgressEl = progress;
-    this.indexSummaryEl = progress.createEl("div", { cls: "gemini-rag-progress-summary" });
+    const progressTop = progress.createEl("div", { cls: "gemini-rag-progress-top" });
+    this.indexSummaryEl = progressTop.createEl("div", { cls: "gemini-rag-progress-summary" });
+    this.indexPercentEl = progressTop.createEl("div", { cls: "gemini-rag-progress-percent" });
+    const progressBar = progress.createEl("div", { cls: "gemini-rag-progress-bar" });
+    this.indexBarFillEl = progressBar.createEl("div", { cls: "gemini-rag-progress-bar-fill" });
     this.indexCurrentEl = progress.createEl("div", { cls: "gemini-rag-progress-current" });
     this.indexFailuresEl = progress.createEl("div", { cls: "gemini-rag-progress-failures" });
     const progressActions = progress.createEl("div", { cls: "gemini-rag-progress-actions" });
@@ -398,6 +404,8 @@ export class RagView extends ItemView {
     if (
       !this.indexProgressEl ||
       !this.indexSummaryEl ||
+      !this.indexPercentEl ||
+      !this.indexBarFillEl ||
       !this.indexCurrentEl ||
       !this.indexFailuresEl ||
       !this.indexControls
@@ -407,6 +415,10 @@ export class RagView extends ItemView {
 
     const isActive = state.status === "running" || state.status === "cancelling";
     this.indexProgressEl.style.display = isActive ? "flex" : "none";
+
+    const total = state.total || 0;
+    const completed = state.indexed + state.skipped + state.failed;
+    const percent = total > 0 ? Math.min(100, Math.round((completed / total) * 100)) : 0;
 
     const summaryParts = [
       `${state.indexed}/${state.total} indexed`,
@@ -437,19 +449,22 @@ export class RagView extends ItemView {
 
     const summaryText = statusText ? `${statusText}. ${summaryParts.join(", ")}` : summaryParts.join(", ");
     this.indexSummaryEl.setText(summaryText);
-    this.indexCurrentEl.setText(state.currentFile ? `Current: ${state.currentFile}` : "");
+    this.indexPercentEl.setText(total > 0 ? `${percent}%` : "");
+    this.indexBarFillEl.style.width = `${percent}%`;
+    this.indexCurrentEl.setText(state.currentFile ? `Current: ${this.shortenPath(state.currentFile)}` : "");
 
     this.indexFailuresEl.empty();
     if (state.failures.length > 0) {
-      this.indexFailuresEl.createEl("div", { text: `Failed files (${state.failures.length})` });
-      const list = this.indexFailuresEl.createEl("ul");
+      const details = this.indexFailuresEl.createEl("details", { cls: "gemini-rag-progress-failures-details" });
+      details.createEl("summary", { text: `Failed files (${state.failures.length})` });
+      const list = details.createEl("ul");
       const maxFailures = 50;
       const failures = state.failures.slice(-maxFailures);
       for (const failure of failures) {
         list.createEl("li", { text: `${failure.path}: ${failure.error}` });
       }
       if (state.failures.length > failures.length) {
-        this.indexFailuresEl.createEl("div", {
+        details.createEl("div", {
           text: `...and ${state.failures.length - failures.length} more`,
         });
       }
@@ -506,6 +521,19 @@ export class RagView extends ItemView {
       this.tooltipEl.remove();
       this.tooltipEl = undefined;
     }
+  }
+
+  private shortenPath(path: string): string {
+    const maxLength = 60;
+    if (path.length <= maxLength) {
+      return path;
+    }
+    const parts = path.split("/");
+    if (parts.length <= 2) {
+      return `…${path.slice(-maxLength + 1)}`;
+    }
+    const tail = parts.slice(-2).join("/");
+    return `…/${tail}`;
   }
 
 
