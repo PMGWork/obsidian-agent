@@ -14,7 +14,6 @@ export const RAG_VIEW_TYPE = "gemini-file-search-rag-view";
 // チャットビュークラス
 export class RagView extends ItemView {
   private plugin: ObsidianRagPlugin;
-  private hintEl?: HTMLElement;
   private chatEl?: HTMLElement;
   private sourcesMap = new Map<number, SourceItem>();
   private tooltipEl?: HTMLElement;
@@ -73,6 +72,12 @@ export class RagView extends ItemView {
     });
     setIcon(createIndexButton, "database");
 
+    const indexButton = headerLeft.createEl("button", {
+      cls: "gemini-rag-icon-btn",
+      attr: { "aria-label": "Index vault", title: "Index vault" },
+    });
+    setIcon(indexButton, "refresh-cw");
+
     const newChatButton = headerActions.createEl("button", {
       cls: "gemini-rag-icon-btn",
       attr: { "aria-label": "New chat", title: "New chat" },
@@ -126,24 +131,26 @@ export class RagView extends ItemView {
     this.renderHistory();
 
     const controls = contentEl.createEl("div", { cls: "gemini-rag-controls" });
-    const input = controls.createEl("textarea", {
+    const inputWrap = controls.createEl("div", { cls: "gemini-rag-input-wrap" });
+    const input = inputWrap.createEl("textarea", {
       cls: "gemini-rag-input",
-      attr: { rows: "5", placeholder: "Ask something about your notes..." },
+      attr: { rows: "3", placeholder: "Ask something about your notes..." },
     });
-    this.hintEl = controls.createEl("div", { cls: "gemini-rag-hint" });
-    this.hintEl.setText("⌘/Ctrl + Enter で送信");
 
-    const buttons = controls.createEl("div", { cls: "gemini-rag-buttons" });
-    const askButton = buttons.createEl("button", { cls: "gemini-rag-btn is-primary", text: "Ask" });
-    const indexButton = buttons.createEl("button", { cls: "gemini-rag-btn", text: "Index vault" });
-    const cancelButton = buttons.createEl("button", { cls: "gemini-rag-btn", text: "Cancel" });
-    this.indexControls = { indexButton, cancelButton };
+    const askButton = inputWrap.createEl("button", {
+      cls: "gemini-rag-btn is-primary is-icon gemini-rag-send",
+      attr: { "aria-label": "Send", title: "Send" },
+    });
+    setIcon(askButton, "send");
 
     const progress = chatWrap.createEl("div", { cls: "gemini-rag-progress" });
     this.indexProgressEl = progress;
     this.indexSummaryEl = progress.createEl("div", { cls: "gemini-rag-progress-summary" });
     this.indexCurrentEl = progress.createEl("div", { cls: "gemini-rag-progress-current" });
     this.indexFailuresEl = progress.createEl("div", { cls: "gemini-rag-progress-failures" });
+    const progressActions = progress.createEl("div", { cls: "gemini-rag-progress-actions" });
+    const cancelButton = progressActions.createEl("button", { cls: "gemini-rag-btn", text: "Cancel" });
+    this.indexControls = { indexButton, cancelButton };
 
 
     this.indexUnsub = this.plugin.indexing.onChange((state) => {
@@ -398,7 +405,7 @@ export class RagView extends ItemView {
       return;
     }
 
-    const isActive = state.status === "running";
+    const isActive = state.status === "running" || state.status === "cancelling";
     this.indexProgressEl.style.display = isActive ? "flex" : "none";
 
     const summaryParts = [
