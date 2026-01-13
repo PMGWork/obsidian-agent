@@ -18,5 +18,14 @@ node_modules
 # obsidian
 data.json
 
+# Build outputs
+styles.css
+
+# Environment variables
+.env
+
+# Logs
+*.log
+
 # Exclude macOS Finder (System Explorer) View States
 .DS_Store

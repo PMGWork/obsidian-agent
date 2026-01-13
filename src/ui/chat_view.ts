@@ -3,6 +3,7 @@
 import { ItemView, Notice, WorkspaceLeaf, MarkdownRenderer, setIcon } from "obsidian";
 import ObsidianRagPlugin from "../main";
 import { GeminiClient, type GroundingMetadata } from "../services/gemini";
+import { IndexProgressState } from "../services/indexing";
 import { indexVaultCommand } from "../commands/index_vault";
 import { createStoreCommand } from "../commands/create_store";
 import { SourceItem, extractSources, annotateAnswer } from "../utils/grounding";
@@ -17,6 +18,18 @@ export class RagView extends ItemView {
   private chatEl?: HTMLElement;
   private sourcesMap = new Map<number, SourceItem>();
   private tooltipEl?: HTMLElement;
+  private statusEl?: HTMLElement;
+  private statusUnsub?: () => void;
+  private indexUnsub?: () => void;
+  private indexProgressEl?: HTMLElement;
+  private indexSummaryEl?: HTMLElement;
+  private indexCurrentEl?: HTMLElement;
+  private indexFailuresEl?: HTMLElement;
+  private indexControls?: {
+    indexButton: HTMLButtonElement;
+    pauseButton: HTMLButtonElement;
+    cancelButton: HTMLButtonElement;
+  };
 
   constructor(leaf: WorkspaceLeaf, plugin: ObsidianRagPlugin) {
     super(leaf);
@@ -35,11 +48,19 @@ export class RagView extends ItemView {
     this.render();
   }
 
+  async onClose(): Promise<void> {
+    this.statusUnsub?.();
+    this.indexUnsub?.();
+    this.hideTooltip();
+  }
+
   // UIを描画する
   private render() {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass("gemini-rag-view");
+    this.statusUnsub?.();
+    this.indexUnsub?.();
 
     const header = contentEl.createEl("div", { cls: "gemini-rag-header" });
     const titleWrap = header.createEl("div", { cls: "gemini-rag-title-wrap" });
@@ -108,7 +129,30 @@ export class RagView extends ItemView {
     const buttons = controls.createEl("div", { cls: "gemini-rag-buttons" });
     const askButton = buttons.createEl("button", { cls: "gemini-rag-btn is-primary", text: "Ask" });
     const indexButton = buttons.createEl("button", { cls: "gemini-rag-btn", text: "Index vault" });
+    const pauseButton = buttons.createEl("button", { cls: "gemini-rag-btn", text: "Pause" });
+    const cancelButton = buttons.createEl("button", { cls: "gemini-rag-btn", text: "Cancel" });
     const storeButton = buttons.createEl("button", { cls: "gemini-rag-btn", text: "Create store" });
+    this.indexControls = { indexButton, pauseButton, cancelButton };
+
+    const progress = contentEl.createEl("div", { cls: "gemini-rag-progress" });
+    this.indexProgressEl = progress;
+    this.indexSummaryEl = progress.createEl("div", { cls: "gemini-rag-progress-summary" });
+    this.indexCurrentEl = progress.createEl("div", { cls: "gemini-rag-progress-current" });
+    this.indexFailuresEl = progress.createEl("div", { cls: "gemini-rag-progress-failures" });
+
+    // Status element
+    this.statusEl = headerActions.createEl("div", { cls: "gemini-rag-status" });
+
+    // Subscribe to status changes
+    this.statusUnsub = this.plugin.onStatusChange((message) => {
+      if (this.statusEl) {
+        this.statusEl.setText(message);
+      }
+    });
+
+    this.indexUnsub = this.plugin.indexing.onChange((state) => {
+      this.renderIndexProgress(state);
+    });
 
     const triggerAsk = async () => {
       const question = input.value.trim();
@@ -135,6 +179,20 @@ export class RagView extends ItemView {
 
     indexButton.addEventListener("click", () => {
       void indexVaultCommand(this.plugin);
+    });
+
+    pauseButton.addEventListener("click", () => {
+      const updated = this.plugin.indexing.togglePause();
+      if (!updated) {
+        new Notice("No indexing task running.");
+      }
+    });
+
+    cancelButton.addEventListener("click", () => {
+      const cancelled = this.plugin.indexing.requestCancel();
+      if (!cancelled) {
+        new Notice("No indexing task running.");
+      }
     });
 
     storeButton.addEventListener("click", () => {
@@ -332,6 +390,80 @@ export class RagView extends ItemView {
       );
     }
     this.scrollToBottom();
+  }
+
+  private renderIndexProgress(state: IndexProgressState) {
+    if (
+      !this.indexProgressEl ||
+      !this.indexSummaryEl ||
+      !this.indexCurrentEl ||
+      !this.indexFailuresEl ||
+      !this.indexControls
+    ) {
+      return;
+    }
+
+    const isActive = state.status !== "idle";
+    this.indexProgressEl.style.display = isActive ? "flex" : "none";
+
+    const summaryParts = [
+      `${state.indexed}/${state.total} indexed`,
+      `${state.skipped} skipped`,
+      `${state.failed} failed`,
+    ];
+
+    let statusText = "";
+    switch (state.status) {
+      case "running":
+        statusText = "Indexing";
+        break;
+      case "paused":
+        statusText = "Index paused";
+        break;
+      case "cancelling":
+        statusText = "Cancelling";
+        break;
+      case "completed":
+        statusText = "Index complete";
+        break;
+      case "cancelled":
+        statusText = "Index cancelled";
+        break;
+      case "error":
+        statusText = "Index failed";
+        break;
+      default:
+        statusText = "";
+    }
+
+    const summaryText = statusText ? `${statusText}. ${summaryParts.join(", ")}` : summaryParts.join(", ");
+    this.indexSummaryEl.setText(summaryText);
+    this.indexCurrentEl.setText(state.currentFile ? `Current: ${state.currentFile}` : "");
+
+    this.indexFailuresEl.empty();
+    if (state.failures.length > 0) {
+      this.indexFailuresEl.createEl("div", { text: `Failed files (${state.failures.length})` });
+      const list = this.indexFailuresEl.createEl("ul");
+      const maxFailures = 50;
+      const failures = state.failures.slice(-maxFailures);
+      for (const failure of failures) {
+        list.createEl("li", { text: `${failure.path}: ${failure.error}` });
+      }
+      if (state.failures.length > failures.length) {
+        this.indexFailuresEl.createEl("div", {
+          text: `...and ${state.failures.length - failures.length} more`,
+        });
+      }
+    }
+
+    const isRunning = state.status === "running";
+    const isPaused = state.status === "paused";
+    const isCancelling = state.status === "cancelling";
+
+    this.indexControls.indexButton.disabled = isRunning || isPaused || isCancelling;
+    this.indexControls.pauseButton.disabled = !(isRunning || isPaused);
+    this.indexControls.cancelButton.disabled = !(isRunning || isPaused);
+    this.indexControls.pauseButton.setText(isPaused ? "Resume" : "Pause");
   }
 
   // ツールチップを表示する

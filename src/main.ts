@@ -4,6 +4,7 @@ import { RagView, RAG_VIEW_TYPE } from "./ui/chat_view";
 import { registerCommands } from "./commands";
 import { openRagPanel } from "./commands/open_panel";
 import { IndexState, DEFAULT_INDEX_STATE, ChatEntry } from "./types";
+import { IndexingController } from "./services/indexing";
 
 // プラグインの設定を保存するための型
 type PersistedData = {
@@ -17,11 +18,13 @@ export default class ObsidianRagPlugin extends Plugin {
   settings: RagSettings;
   indexState: IndexState;
   history: ChatEntry[];
+  indexing: IndexingController;
   private statusListeners = new Set<(message: string) => void>();
 
   // プラグインの初期化
   async onload() {
     await this.loadSettings();
+    this.indexing = new IndexingController();
 
     this.registerView(RAG_VIEW_TYPE, (leaf) => new RagView(leaf, this));
     this.addSettingTab(new RagSettingTab(this.app, this));
