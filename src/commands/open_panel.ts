@@ -4,10 +4,9 @@ import { RAG_VIEW_TYPE } from "../ui/chat_view";
 // パネルを開くコマンド
 export async function openRagPanel(plugin: ObsidianRagPlugin) {
   const { workspace } = plugin.app;
-  let leaf: import("obsidian").WorkspaceLeaf | undefined = workspace.getLeavesOfType(RAG_VIEW_TYPE)[0];
+  let leaf: import("obsidian").WorkspaceLeaf | null = workspace.getLeavesOfType(RAG_VIEW_TYPE)[0] ?? null;
   if (!leaf) {
-    const rightLeaf = workspace.getRightLeaf(false);
-    leaf = rightLeaf ?? undefined;
+    leaf = workspace.getRightLeaf(false);
     if (!leaf) {
       leaf = workspace.getLeaf(false);
     }

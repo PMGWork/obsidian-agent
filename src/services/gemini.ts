@@ -142,33 +142,11 @@ export class GeminiClient {
     history: ChatEntry[] = [],
     includeThoughts?: boolean
   ): Promise<GenerateContentResponse> {
-    const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
-
-    for (const entry of history) {
-      contents.push({ role: "user", parts: [{ text: entry.question }] });
-      contents.push({ role: "model", parts: [{ text: entry.answer }] });
-    }
-    contents.push({ role: "user", parts: [{ text: question }] });
+    const body = this.buildGenerateBody({ model, storeName, question, history, includeThoughts });
 
     return (await this.request(`${BASE_URL}/models/${model}:generateContent`, {
       method: "POST",
-      body: JSON.stringify({
-        contents,
-        tools: [
-          {
-            fileSearch: {
-              fileSearchStoreNames: [storeName],
-            },
-          },
-        ],
-        generationConfig: includeThoughts
-          ? {
-              thinkingConfig: {
-                includeThoughts: true,
-              },
-            }
-          : undefined,
-      }),
+      body,
     })) as GenerateContentResponse;
   }
 
@@ -180,13 +158,7 @@ export class GeminiClient {
     history: ChatEntry[] = [],
     includeThoughts?: boolean
   ): Promise<void> {
-    const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
-
-    for (const entry of history) {
-      contents.push({ role: "user", parts: [{ text: entry.question }] });
-      contents.push({ role: "model", parts: [{ text: entry.answer }] });
-    }
-    contents.push({ role: "user", parts: [{ text: question }] });
+    const body = this.buildGenerateBody({ model, storeName, question, history, includeThoughts });
 
     // eslint-disable-next-line no-restricted-globals -- SSE streaming is not supported by requestUrl
     const response = await fetch(
@@ -197,23 +169,7 @@ export class GeminiClient {
           "x-goog-api-key": this.apiKey,
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          contents,
-          tools: [
-            {
-              fileSearch: {
-                fileSearchStoreNames: [storeName],
-              },
-            },
-          ],
-          generationConfig: includeThoughts
-            ? {
-                thinkingConfig: {
-                  includeThoughts: true,
-                },
-              }
-            : undefined,
-        }),
+        body,
       }
     );
 
@@ -274,6 +230,54 @@ export class GeminiClient {
     const thoughtSummary = thoughtParts.join("");
     const grounding = candidate?.groundingMetadata ?? candidate?.grounding_metadata;
     return { text, grounding, thoughtSummary: thoughtSummary || undefined };
+  }
+
+  private buildGenerateBody({
+    model,
+    storeName,
+    question,
+    history,
+    includeThoughts,
+  }: {
+    model: string;
+    storeName: string;
+    question: string;
+    history: ChatEntry[];
+    includeThoughts?: boolean;
+  }): string {
+    const contents = this.buildContents(history, question);
+    return JSON.stringify({
+      contents,
+      tools: [
+        {
+          fileSearch: {
+            fileSearchStoreNames: [storeName],
+          },
+        },
+      ],
+      generationConfig: includeThoughts
+        ? {
+            thinkingConfig: {
+              includeThoughts: true,
+            },
+          }
+        : undefined,
+    });
+  }
+
+  private buildContents(
+    history: ChatEntry[],
+    question: string
+  ): Array<{ role: string; parts: Array<{ text: string }> }> {
+    const contents: Array<{ role: string; parts: Array<{ text: string }> }> = [];
+
+    for (const entry of history) {
+      contents.push({ role: "user", parts: [{ text: entry.question }] });
+      contents.push({ role: "model", parts: [{ text: entry.answer }] });
+    }
+    contents.push({ role: "user", parts: [{ text: question }] });
+
+    return contents;
   }
 
   private async request(url: string, init: { method: string; body?: string }): Promise<unknown> {

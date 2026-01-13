@@ -18,8 +18,6 @@ export class RagView extends ItemView {
   private chatEl?: HTMLElement;
   private sourcesMap = new Map<number, SourceItem>();
   private tooltipEl?: HTMLElement;
-  private statusEl?: HTMLElement;
-  private statusUnsub?: () => void;
   private indexUnsub?: () => void;
   private indexProgressEl?: HTMLElement;
   private indexSummaryEl?: HTMLElement;
@@ -48,7 +46,6 @@ export class RagView extends ItemView {
   }
 
   async onClose(): Promise<void> {
-    this.statusUnsub?.();
     this.indexUnsub?.();
     this.hideTooltip();
   }
@@ -58,7 +55,6 @@ export class RagView extends ItemView {
     const { contentEl } = this;
     contentEl.empty();
     contentEl.addClass("gemini-rag-view");
-    this.statusUnsub?.();
     this.indexUnsub?.();
 
     const header = contentEl.createEl("div", { cls: "gemini-rag-header" });
@@ -149,15 +145,6 @@ export class RagView extends ItemView {
     this.indexCurrentEl = progress.createEl("div", { cls: "gemini-rag-progress-current" });
     this.indexFailuresEl = progress.createEl("div", { cls: "gemini-rag-progress-failures" });
 
-    // Status element
-    this.statusEl = headerActions.createEl("div", { cls: "gemini-rag-status" });
-
-    // Subscribe to status changes
-    this.statusUnsub = this.plugin.onStatusChange((message) => {
-      if (this.statusEl) {
-        this.statusEl.setText(message);
-      }
-    });
 
     this.indexUnsub = this.plugin.indexing.onChange((state) => {
       this.renderIndexProgress(state);
@@ -243,6 +230,7 @@ export class RagView extends ItemView {
       let fullText = "";
       let fullThought = "";
       let combinedGrounding: GroundingMetadata | undefined;
+      let streamingSources: SourceItem[] = [];
 
       if (!this.chatEl) return;
 
@@ -272,13 +260,10 @@ export class RagView extends ItemView {
               ...(grounding.groundingSupports ?? []),
             ],
           };
+          streamingSources = extractSources(combinedGrounding, () => "");
         }
 
-        const annotatedText = annotateAnswer(
-          fullText,
-          combinedGrounding,
-          extractSources(combinedGrounding, () => "") // Temporary source resolution
-        );
+        const annotatedText = annotateAnswer(fullText, combinedGrounding, streamingSources);
         const output = this.formatOutput(annotatedText, fullThought, false);
 
         answerEl.empty();
