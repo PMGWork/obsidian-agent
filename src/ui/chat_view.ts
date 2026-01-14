@@ -92,7 +92,7 @@ export class RagView extends ItemView {
       void triggerAsk();
     });
     input.addEventListener("keydown", (event) => {
-      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+      if (event.shiftKey && event.key === "Enter") {
         event.preventDefault();
         void triggerAsk();
       }
