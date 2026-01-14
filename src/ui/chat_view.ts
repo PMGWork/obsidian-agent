@@ -5,6 +5,7 @@ import ObsidianRagPlugin from "../main";
 import { GeminiClient, type GroundingMetadata } from "../services/gemini";
 import { indexVaultCommand } from "../commands/index_vault";
 import { createStoreCommand } from "../commands/create_store";
+import { exportChatCommand } from "../commands/export_chat";
 import { SourceItem, extractSources, annotateAnswer } from "../utils/grounding";
 import { resolveVaultPath, openSource } from "../utils/source_navigation";
 import { CitationTooltip } from "./chat_view/citation_tooltip";
@@ -85,6 +86,10 @@ export class RagView extends ItemView {
       void createStoreCommand(this.plugin);
     });
 
+    headerButtons.exportButton.addEventListener("click", () => {
+      void exportChatCommand(this.plugin);
+    });
+
     headerButtons.newChatButton.addEventListener("click", () => {
       void this.clearChat();
     });
@@ -137,13 +142,19 @@ export class RagView extends ItemView {
     });
     setIcon(indexButton, "refresh-cw");
 
+    const exportButton = headerActions.createEl("button", {
+      cls: "gemini-rag-icon-btn",
+      attr: { "aria-label": "Export chat", title: "Export chat" },
+    });
+    setIcon(exportButton, "download");
+
     const newChatButton = headerActions.createEl("button", {
       cls: "gemini-rag-icon-btn",
       attr: { "aria-label": "New chat", title: "New chat" },
     });
     setIcon(newChatButton, "plus-circle");
 
-    return { settingsButton, createIndexButton, indexButton, newChatButton };
+    return { settingsButton, createIndexButton, indexButton, exportButton, newChatButton };
   }
 
   // チャット表示領域を描画する
@@ -405,6 +416,16 @@ export class RagView extends ItemView {
       new Notice("Copied to clipboard");
     });
     
+    // Delete button
+    const deleteButton = actions.createEl("button", {
+      cls: "gemini-rag-action-btn",
+      attr: { "aria-label": "Delete", title: "Delete this question and answer pair" },
+    });
+    setIcon(deleteButton, "trash");
+    deleteButton.addEventListener("click", () => {
+      void this.deleteMessage(entry.id);
+    });
+    
     // Regenerate button (only for last message)
     if (isLast) {
       const regenerateButton = actions.createEl("button", {
@@ -416,6 +437,20 @@ export class RagView extends ItemView {
         void this.regenerateLastMessage();
       });
     }
+  }
+
+  // メッセージを削除
+  private async deleteMessage(id: string) {
+    const index = this.plugin.history.findIndex(entry => entry.id === id);
+    if (index === -1) {
+      new Notice("Message not found");
+      return;
+    }
+    
+    this.plugin.history.splice(index, 1);
+    await this.plugin.saveSettings();
+    this.renderHistory();
+    new Notice("Message deleted");
   }
 
   // 最後のメッセージを再生成

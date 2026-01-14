@@ -3,6 +3,7 @@ import { openRagPanel } from "./open_panel";
 import { indexVaultCommand } from "./index_vault";
 import { createStoreCommand } from "./create_store";
 import { newChatCommand } from "./new_chat";
+import { exportChatCommand } from "./export_chat";
 
 // コマンドを登録する
 export function registerCommands(plugin: ObsidianRagPlugin) {
@@ -28,5 +29,11 @@ export function registerCommands(plugin: ObsidianRagPlugin) {
     id: "create-file-search-store",
     name: "Create file search store",
     callback: () => createStoreCommand(plugin),
+  });
+
+  plugin.addCommand({
+    id: "export-chat-history",
+    name: "Export chat history",
+    callback: () => exportChatCommand(plugin),
   });
 }
