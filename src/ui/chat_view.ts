@@ -10,6 +10,7 @@ import { resolveVaultPath, openSource } from "../utils/source_navigation";
 import { CitationTooltip } from "./chat_view/citation_tooltip";
 import { formatOutput } from "./chat_view/formatting";
 import { IndexProgressUI } from "./chat_view/index_progress";
+import { ChatEntry } from "../types";
 
 export const RAG_VIEW_TYPE = "gemini-file-search-rag-view";
 
@@ -92,7 +93,9 @@ export class RagView extends ItemView {
       void triggerAsk();
     });
     input.addEventListener("keydown", (event) => {
-      if (event.shiftKey && event.key === "Enter") {
+      // Shift+Enter or Ctrl/Cmd+Enter to send
+      if ((event.shiftKey && event.key === "Enter") || 
+          ((event.ctrlKey || event.metaKey) && event.key === "Enter")) {
         event.preventDefault();
         void triggerAsk();
       }
@@ -203,7 +206,10 @@ export class RagView extends ItemView {
     const inputWrap = controls.createEl("div", { cls: "gemini-rag-input-wrap" });
     const input = inputWrap.createEl("textarea", {
       cls: "gemini-rag-input",
-      attr: { rows: "3", placeholder: "Ask something about your notes..." },
+      attr: { 
+        rows: "3", 
+        placeholder: "Ask something about your notes... (Shift+Enter or Cmd/Ctrl+Enter to send)" 
+      },
     });
 
     const askButton = inputWrap.createEl("button", {
@@ -359,7 +365,12 @@ export class RagView extends ItemView {
       return;
     }
 
-    for (const entry of this.plugin.history) {
+    for (let i = 0; i < this.plugin.history.length; i++) {
+      const entry = this.plugin.history[i];
+      if (!entry) continue;
+      
+      const isLast = i === this.plugin.history.length - 1;
+      
       const userBubble = this.chatEl.createEl("div", { cls: "gemini-rag-chat-bubble user" });
       userBubble.createEl("div", { cls: "gemini-rag-chat-text", text: entry.question });
 
@@ -372,8 +383,59 @@ export class RagView extends ItemView {
         this.plugin.app.vault.getRoot().path,
         this
       );
+      
+      // Add action buttons for assistant messages
+      this.addMessageActions(assistantBubble, entry, isLast);
     }
     this.scrollToBottom();
+  }
+
+  // メッセージにアクションボタンを追加
+  private addMessageActions(bubble: HTMLElement, entry: ChatEntry, isLast: boolean) {
+    const actions = bubble.createEl("div", { cls: "gemini-rag-message-actions" });
+    
+    // Copy button
+    const copyButton = actions.createEl("button", {
+      cls: "gemini-rag-action-btn",
+      attr: { "aria-label": "Copy", title: "Copy" },
+    });
+    setIcon(copyButton, "copy");
+    copyButton.addEventListener("click", () => {
+      void navigator.clipboard.writeText(entry.answer);
+      new Notice("Copied to clipboard");
+    });
+    
+    // Regenerate button (only for last message)
+    if (isLast) {
+      const regenerateButton = actions.createEl("button", {
+        cls: "gemini-rag-action-btn",
+        attr: { "aria-label": "Regenerate", title: "Regenerate" },
+      });
+      setIcon(regenerateButton, "refresh-cw");
+      regenerateButton.addEventListener("click", () => {
+        void this.regenerateLastMessage();
+      });
+    }
+  }
+
+  // 最後のメッセージを再生成
+  private async regenerateLastMessage() {
+    if (this.plugin.history.length === 0) {
+      new Notice("No messages to regenerate");
+      return;
+    }
+    
+    const lastEntry = this.plugin.history[this.plugin.history.length - 1];
+    if (!lastEntry) {
+      new Notice("No messages to regenerate");
+      return;
+    }
+    
+    // Remove last entry and ask again
+    this.plugin.history.pop();
+    await this.plugin.saveSettings();
+    this.renderHistory();
+    await this.ask(lastEntry.question);
   }
 
   private shortenPath(path: string): string {
