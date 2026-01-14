@@ -377,9 +377,7 @@ export class RagView extends ItemView {
     }
 
     for (let i = 0; i < this.plugin.history.length; i++) {
-      const entry = this.plugin.history[i];
-      if (!entry) continue;
-      
+      const entry = this.plugin.history[i]!;
       const isLast = i === this.plugin.history.length - 1;
       
       const userBubble = this.chatEl.createEl("div", { cls: "gemini-rag-chat-bubble user" });
@@ -460,12 +458,7 @@ export class RagView extends ItemView {
       return;
     }
     
-    const lastEntry = this.plugin.history[this.plugin.history.length - 1];
-    if (!lastEntry) {
-      new Notice("No messages to regenerate");
-      return;
-    }
-    
+    const lastEntry = this.plugin.history[this.plugin.history.length - 1]!;
     // Remove last entry and ask again
     this.plugin.history.pop();
     await this.plugin.saveSettings();

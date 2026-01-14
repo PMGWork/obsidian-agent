@@ -22,6 +22,7 @@ export async function exportChatCommand(plugin: ObsidianRagPlugin) {
     }
 
     // Create filename with timestamp
+    // ISO format: 2026-01-14T11:48:23.456Z -> remove milliseconds and Z
     const timestamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, -5);
     const filename = `chat-export-${timestamp}.md`;
     
