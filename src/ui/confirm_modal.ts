@@ -1,5 +1,6 @@
 import { App, Modal } from "obsidian";
 
+// 確認モーダルのオプション型
 type ConfirmOptions = {
   title: string;
   message: string;
@@ -7,6 +8,7 @@ type ConfirmOptions = {
   cancelText?: string;
 };
 
+// 確認モーダルのクラス
 class ConfirmModal extends Modal {
   private titleText: string;
   private message: string;
@@ -15,6 +17,7 @@ class ConfirmModal extends Modal {
   private resolve: (value: boolean) => void;
   private resolved = false;
 
+  // コンストラクタ
   constructor(app: App, options: ConfirmOptions, resolve: (value: boolean) => void) {
     super(app);
     this.titleText = options.title;
@@ -24,6 +27,7 @@ class ConfirmModal extends Modal {
     this.resolve = resolve;
   }
 
+  // モーダルが開かれたときの処理
   onOpen(): void {
     this.setTitle(this.titleText);
     const { contentEl } = this;
@@ -40,12 +44,14 @@ class ConfirmModal extends Modal {
     confirmButton.addEventListener("click", () => this.finish(true));
   }
 
+  // モーダルが閉じられたときの処理
   onClose(): void {
     if (!this.resolved) {
       this.resolve(false);
     }
   }
-
+  
+  // 処理を完了するメソッド
   private finish(value: boolean): void {
     if (this.resolved) {
       return;
@@ -56,6 +62,7 @@ class ConfirmModal extends Modal {
   }
 }
 
+// 確認モーダルを表示する関数
 export function confirmAction(app: App, options: ConfirmOptions): Promise<boolean> {
   return new Promise((resolve) => {
     const modal = new ConfirmModal(app, options, resolve);

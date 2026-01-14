@@ -109,6 +109,7 @@ export function annotateAnswer(
 	return output;
 }
 
+// 単語境界に位置を調整する
 function clampToWordBoundary(text: string, pos: number): number {
 	if (pos <= 0 || pos >= text.length) {
 		return pos;

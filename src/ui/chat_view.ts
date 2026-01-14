@@ -3,11 +3,13 @@
 import { ItemView, Notice, WorkspaceLeaf, MarkdownRenderer, setIcon } from "obsidian";
 import ObsidianRagPlugin from "../main";
 import { GeminiClient, type GroundingMetadata } from "../services/gemini";
-import { IndexProgressState } from "../services/indexing";
 import { indexVaultCommand } from "../commands/index_vault";
 import { createStoreCommand } from "../commands/create_store";
 import { SourceItem, extractSources, annotateAnswer } from "../utils/grounding";
 import { resolveVaultPath, openSource } from "../utils/source_navigation";
+import { CitationTooltip } from "./chat_view/citation_tooltip";
+import { formatOutput } from "./chat_view/formatting";
+import { IndexProgressUI } from "./chat_view/index_progress";
 
 export const RAG_VIEW_TYPE = "gemini-file-search-rag-view";
 
@@ -16,39 +18,35 @@ export class RagView extends ItemView {
   private plugin: ObsidianRagPlugin;
   private chatEl?: HTMLElement;
   private sourcesMap = new Map<number, SourceItem>();
-  private tooltipEl?: HTMLElement;
+  private tooltip = new CitationTooltip();
   private indexUnsub?: () => void;
-  private indexProgressEl?: HTMLElement;
-  private indexSummaryEl?: HTMLElement;
-  private indexPercentEl?: HTMLElement;
-  private indexBarFillEl?: HTMLElement;
-  private indexCurrentEl?: HTMLElement;
-  private indexFailuresEl?: HTMLElement;
-  private indexControls?: {
-    indexButton: HTMLButtonElement;
-    cancelButton: HTMLButtonElement;
-  };
+  private indexProgress?: IndexProgressUI;
 
+  // コンストラクタ
   constructor(leaf: WorkspaceLeaf, plugin: ObsidianRagPlugin) {
     super(leaf);
     this.plugin = plugin;
   }
 
+  // ビュータイプを取得する
   getViewType(): string {
     return RAG_VIEW_TYPE;
   }
 
+  // 表示テキストを取得する
   getDisplayText(): string {
     return "Obsidian agent";
   }
 
+  // ビューが開かれたときの処理
   async onOpen(): Promise<void> {
     this.render();
   }
 
+  // ビューが閉じられたときの処理
   async onClose(): Promise<void> {
     this.indexUnsub?.();
-    this.hideTooltip();
+    this.tooltip.hide();
   }
 
   // UIを描画する
@@ -58,6 +56,62 @@ export class RagView extends ItemView {
     contentEl.addClass("gemini-rag-view");
     this.indexUnsub?.();
 
+    const headerButtons = this.renderHeader(contentEl);
+    const { chatWrap, chatEl } = this.renderChatArea(contentEl);
+    this.chatEl = chatEl;
+    this.renderHistory();
+
+    const { input, askButton } = this.renderControls(contentEl);
+    const cancelButton = this.setupIndexProgress(chatWrap, headerButtons.indexButton);
+
+    const triggerAsk = async () => {
+      const question = input.value.trim();
+      if (!question) {
+        return;
+      }
+      input.value = "";
+      await this.ask(question);
+    };
+
+    headerButtons.settingsButton.addEventListener("click", () => {
+      const appSetting = (this.app as { setting?: { open: () => void; openTabById: (id: string) => void } }).setting;
+      if (!appSetting) return;
+      appSetting.open();
+      appSetting.openTabById(this.plugin.manifest.id);
+    });
+
+    headerButtons.createIndexButton.addEventListener("click", () => {
+      void createStoreCommand(this.plugin);
+    });
+
+    headerButtons.newChatButton.addEventListener("click", () => {
+      void this.clearChat();
+    });
+
+    askButton.addEventListener("click", () => {
+      void triggerAsk();
+    });
+    input.addEventListener("keydown", (event) => {
+      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
+        event.preventDefault();
+        void triggerAsk();
+      }
+    });
+
+    headerButtons.indexButton.addEventListener("click", () => {
+      void indexVaultCommand(this.plugin);
+    });
+
+    cancelButton.addEventListener("click", () => {
+      const cancelled = this.plugin.indexing.requestCancel();
+      if (!cancelled) {
+        new Notice("No indexing task running.");
+      }
+    });
+  }
+
+  // ヘッダーを描画する
+  private renderHeader(contentEl: HTMLElement) {
     const header = contentEl.createEl("div", { cls: "gemini-rag-header" });
     const headerLeft = header.createEl("div", { cls: "gemini-rag-header-left" });
     const headerActions = header.createEl("div", { cls: "gemini-rag-header-actions" });
@@ -86,10 +140,21 @@ export class RagView extends ItemView {
     });
     setIcon(newChatButton, "plus-circle");
 
+    return { settingsButton, createIndexButton, indexButton, newChatButton };
+  }
+
+  // チャット表示領域を描画する
+  private renderChatArea(contentEl: HTMLElement) {
     const main = contentEl.createEl("div", { cls: "gemini-rag-main" });
     const chatWrap = main.createEl("div", { cls: "gemini-rag-chat-wrap" });
-    this.chatEl = chatWrap.createEl("div", { cls: "gemini-rag-chat" });
-    this.chatEl.addEventListener("click", (event) => {
+    const chatEl = chatWrap.createEl("div", { cls: "gemini-rag-chat" });
+    this.bindCitationEvents(chatEl);
+    return { chatWrap, chatEl };
+  }
+
+  // チャット領域のリンクイベントを登録する
+  private bindCitationEvents(chatEl: HTMLElement) {
+    chatEl.addEventListener("click", (event) => {
       const target = event.target as HTMLElement | null;
       if (!target) return;
       const link = target.closest("a");
@@ -106,7 +171,7 @@ export class RagView extends ItemView {
         void openSource(this.app, source);
       }
     });
-    this.chatEl.addEventListener("mouseover", (event) => {
+    chatEl.addEventListener("mouseover", (event) => {
       const target = event.target as HTMLElement | null;
       if (!target) return;
       const link = target.closest("a");
@@ -118,20 +183,22 @@ export class RagView extends ItemView {
       if (!Number.isFinite(index)) return;
       const source = this.sourcesMap.get(index);
       if (source) {
-        this.showTooltip(link, source);
+        this.tooltip.show(link, source);
       }
     });
-    this.chatEl.addEventListener("mouseout", (event) => {
+    chatEl.addEventListener("mouseout", (event) => {
       const target = event.target as HTMLElement | null;
       if (!target) return;
       const link = target.closest("a");
       if (!link) return;
       const href = link.getAttribute("href");
       if (!href || !href.startsWith("citation:")) return;
-      this.hideTooltip();
+      this.tooltip.hide();
     });
-    this.renderHistory();
+  }
 
+  // 入力コントロールを描画する
+  private renderControls(contentEl: HTMLElement) {
     const controls = contentEl.createEl("div", { cls: "gemini-rag-controls" });
     const inputWrap = controls.createEl("div", { cls: "gemini-rag-input-wrap" });
     const input = inputWrap.createEl("textarea", {
@@ -145,69 +212,18 @@ export class RagView extends ItemView {
     });
     setIcon(askButton, "send");
 
-    const progress = chatWrap.createEl("div", { cls: "gemini-rag-progress" });
-    this.indexProgressEl = progress;
-    const progressTop = progress.createEl("div", { cls: "gemini-rag-progress-top" });
-    this.indexSummaryEl = progressTop.createEl("div", { cls: "gemini-rag-progress-summary" });
-    this.indexPercentEl = progressTop.createEl("div", { cls: "gemini-rag-progress-percent" });
-    const progressBar = progress.createEl("div", { cls: "gemini-rag-progress-bar" });
-    this.indexBarFillEl = progressBar.createEl("div", { cls: "gemini-rag-progress-bar-fill" });
-    this.indexCurrentEl = progress.createEl("div", { cls: "gemini-rag-progress-current" });
-    this.indexFailuresEl = progress.createEl("div", { cls: "gemini-rag-progress-failures" });
-    const progressActions = progress.createEl("div", { cls: "gemini-rag-progress-actions" });
-    const cancelButton = progressActions.createEl("button", { cls: "gemini-rag-btn", text: "Cancel" });
-    this.indexControls = { indexButton, cancelButton };
+    return { input, askButton };
+  }
 
+  // インデックス進捗UIを初期化する
+  private setupIndexProgress(chatWrap: HTMLElement, indexButton: HTMLButtonElement) {
+    this.indexProgress = new IndexProgressUI(chatWrap, indexButton, this.shortenPath.bind(this));
 
     this.indexUnsub = this.plugin.indexing.onChange((state) => {
-      this.renderIndexProgress(state);
+      this.indexProgress?.render(state);
     });
 
-    const triggerAsk = async () => {
-      const question = input.value.trim();
-      if (!question) {
-        return;
-      }
-      input.value = "";
-      await this.ask(question);
-    };
-
-    settingsButton.addEventListener("click", () => {
-      const appSetting = (this.app as { setting?: { open: () => void; openTabById: (id: string) => void } }).setting;
-      if (!appSetting) return;
-      appSetting.open();
-      appSetting.openTabById(this.plugin.manifest.id);
-    });
-
-    createIndexButton.addEventListener("click", () => {
-      void createStoreCommand(this.plugin);
-    });
-
-    newChatButton.addEventListener("click", () => {
-      void this.clearChat();
-    });
-
-    askButton.addEventListener("click", () => {
-      void triggerAsk();
-    });
-    input.addEventListener("keydown", (event) => {
-      if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-        event.preventDefault();
-        void triggerAsk();
-      }
-    });
-
-    indexButton.addEventListener("click", () => {
-      void indexVaultCommand(this.plugin);
-    });
-
-    cancelButton.addEventListener("click", () => {
-      const cancelled = this.plugin.indexing.requestCancel();
-      if (!cancelled) {
-        new Notice("No indexing task running.");
-      }
-    });
-
+    return this.indexProgress.cancelButton;
   }
 
   // チャットをクリアする
@@ -217,8 +233,6 @@ export class RagView extends ItemView {
     this.sourcesMap.clear();
     this.renderHistory();
   }
-
-
 
   // 質問を送信して回答を取得する
   private async ask(question: string) {
@@ -277,7 +291,7 @@ export class RagView extends ItemView {
         }
 
         const annotatedText = annotateAnswer(fullText, combinedGrounding, streamingSources);
-        const output = this.formatOutput(annotatedText, fullThought, false);
+        const output = formatOutput(annotatedText, fullThought, false);
 
         answerEl.empty();
         await MarkdownRenderer.render(
@@ -297,7 +311,7 @@ export class RagView extends ItemView {
         this.sourcesMap.set(source.index, source);
       }
       const finalAnnotatedText = annotateAnswer(fullText, combinedGrounding, sources);
-      const finalOutput = this.formatOutput(finalAnnotatedText, fullThought, true);
+      const finalOutput = formatOutput(finalAnnotatedText, fullThought, true);
 
       answerEl.empty();
       await MarkdownRenderer.render(
@@ -319,44 +333,6 @@ export class RagView extends ItemView {
     }
   }
 
-  // 出力をフォーマットする
-  private formatOutput(answer: string, thoughtSummary?: string, isFinal = false): string {
-    let title = "Thinking...";
-    if (isFinal) {
-      title = "推論完了";
-    } else if (thoughtSummary) {
-      title = this.getLatestThoughtTitle(thoughtSummary);
-    }
-
-    const callout = `> [!info] ${title}`;
-
-    if (!answer.trim()) {
-      return callout;
-    }
-    return `${callout}\n\n${answer}`;
-  }
-
-  // 最新の思考内容からタイトルを生成する
-  private getLatestThoughtTitle(fullThought: string): string {
-    if (!fullThought) return "Thinking...";
-
-    const lines = fullThought.split("\n").map((l) => l.trim()).filter((l) => l.length > 0);
-    const lastLine = lines[lines.length - 1];
-
-    if (!lastLine) return "Thinking...";
-
-    // 見出し記号などを削除
-    const cleanLine = lastLine
-      .replace(/^#+\s*/, "")
-      .replace(/^[-*]\s+/, "")
-      .replace(/^>\s+/, "");
-
-    const maxLength = 50;
-    if (cleanLine.length > maxLength) {
-      return cleanLine.substring(0, maxLength) + "...";
-    }
-    return cleanLine;
-  }
 
   // 履歴に追加する
   private pushHistory(question: string, answer: string) {
@@ -400,129 +376,6 @@ export class RagView extends ItemView {
     this.scrollToBottom();
   }
 
-  private renderIndexProgress(state: IndexProgressState) {
-    if (
-      !this.indexProgressEl ||
-      !this.indexSummaryEl ||
-      !this.indexPercentEl ||
-      !this.indexBarFillEl ||
-      !this.indexCurrentEl ||
-      !this.indexFailuresEl ||
-      !this.indexControls
-    ) {
-      return;
-    }
-
-    const isActive = state.status === "running" || state.status === "cancelling";
-    this.indexProgressEl.style.display = isActive ? "flex" : "none";
-
-    const total = state.total || 0;
-    const completed = state.indexed + state.skipped + state.failed;
-    const percent = total > 0 ? Math.min(100, Math.round((completed / total) * 100)) : 0;
-
-    const summaryParts = [
-      `${state.indexed}/${state.total} indexed`,
-      `${state.skipped} skipped`,
-      `${state.failed} failed`,
-    ];
-
-    let statusText = "";
-    switch (state.status) {
-      case "running":
-        statusText = "Indexing";
-        break;
-      case "cancelling":
-        statusText = "Cancelling";
-        break;
-      case "completed":
-        statusText = "Index complete";
-        break;
-      case "cancelled":
-        statusText = "Index cancelled";
-        break;
-      case "error":
-        statusText = "Index failed";
-        break;
-      default:
-        statusText = "";
-    }
-
-    const summaryText = statusText ? `${statusText}. ${summaryParts.join(", ")}` : summaryParts.join(", ");
-    this.indexSummaryEl.setText(summaryText);
-    this.indexPercentEl.setText(total > 0 ? `${percent}%` : "");
-    this.indexBarFillEl.style.width = `${percent}%`;
-    this.indexCurrentEl.setText(state.currentFile ? `Current: ${this.shortenPath(state.currentFile)}` : "");
-
-    this.indexFailuresEl.empty();
-    if (state.failures.length > 0) {
-      const details = this.indexFailuresEl.createEl("details", { cls: "gemini-rag-progress-failures-details" });
-      details.createEl("summary", { text: `Failed files (${state.failures.length})` });
-      const list = details.createEl("ul");
-      const maxFailures = 50;
-      const failures = state.failures.slice(-maxFailures);
-      for (const failure of failures) {
-        list.createEl("li", { text: `${failure.path}: ${failure.error}` });
-      }
-      if (state.failures.length > failures.length) {
-        details.createEl("div", {
-          text: `...and ${state.failures.length - failures.length} more`,
-        });
-      }
-    }
-
-    const isRunning = state.status === "running";
-    const isCancelling = state.status === "cancelling";
-
-    this.indexControls.indexButton.disabled = isRunning || isCancelling;
-    this.indexControls.cancelButton.disabled = !(isRunning || isCancelling);
-  }
-
-  // ツールチップを表示する
-  private showTooltip(anchor: HTMLElement, source: SourceItem) {
-    this.hideTooltip();
-    const tooltip = document.createElement("div");
-    tooltip.className = "gemini-rag-tooltip";
-
-    const header = tooltip.createEl("div", { cls: "gemini-rag-tooltip-header" });
-    header.createEl("span", { cls: "gemini-rag-tooltip-icon", text: "📄" });
-    header.createEl("span", { cls: "gemini-rag-tooltip-title", text: source.label });
-
-    if (source.text) {
-      const preview = source.text.slice(0, 150).trim();
-      const previewText = preview.length < source.text.length ? preview + "..." : preview;
-      tooltip.createEl("div", { cls: "gemini-rag-tooltip-body", text: previewText });
-    } else if (source.detail) {
-      tooltip.createEl("div", { cls: "gemini-rag-tooltip-body", text: source.detail });
-    }
-
-    document.body.appendChild(tooltip);
-    this.tooltipEl = tooltip;
-
-    const rect = anchor.getBoundingClientRect();
-    const tooltipRect = tooltip.getBoundingClientRect();
-    let left = rect.left + rect.width / 2 - tooltipRect.width / 2;
-    let top = rect.bottom + 8;
-
-    if (left < 8) left = 8;
-    if (left + tooltipRect.width > window.innerWidth - 8) {
-      left = window.innerWidth - tooltipRect.width - 8;
-    }
-    if (top + tooltipRect.height > window.innerHeight - 8) {
-      top = rect.top - tooltipRect.height - 8;
-    }
-
-    tooltip.style.left = `${left}px`;
-    tooltip.style.top = `${top}px`;
-  }
-
-  // ツールチップを非表示にする
-  private hideTooltip() {
-    if (this.tooltipEl) {
-      this.tooltipEl.remove();
-      this.tooltipEl = undefined;
-    }
-  }
-
   private shortenPath(path: string): string {
     const maxLength = 60;
     if (path.length <= maxLength) {
@@ -535,7 +388,6 @@ export class RagView extends ItemView {
     const tail = parts.slice(-2).join("/");
     return `…/${tail}`;
   }
-
 
   // 最下部へスクロール
   private scrollToBottom() {

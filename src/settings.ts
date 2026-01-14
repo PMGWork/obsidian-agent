@@ -26,10 +26,12 @@ export class RagSettingTab extends PluginSettingTab {
     this.plugin = plugin;
   }
 
+  // 設定画面の表示
   display(): void {
     const { containerEl } = this;
     containerEl.empty();
-
+    
+    // タイトル
     new Setting(containerEl)
       .setName("API key")
       .setDesc("Gemini API key. This plugin sends note contents to google for indexing and answers.")
@@ -44,6 +46,7 @@ export class RagSettingTab extends PluginSettingTab {
           });
       });
 
+    // モデル選択
     new Setting(containerEl)
       .setName("Model")
       .setDesc("Select the model used for answers.")
@@ -60,6 +63,7 @@ export class RagSettingTab extends PluginSettingTab {
           })
       );
 
+    // ストア名設定
     new Setting(containerEl)
       .setName("File search store name")
       .setDesc("Full resource name")
@@ -72,6 +76,7 @@ export class RagSettingTab extends PluginSettingTab {
           })
       );
 
+    // ストア表示名設定
     new Setting(containerEl)
       .setName("Store display name")
       .setDesc("Used when creating a new store from the command palette.")
@@ -84,6 +89,7 @@ export class RagSettingTab extends PluginSettingTab {
           })
       );
 
+    // ローカルインデックス状態リセットボタン
     new Setting(containerEl)
       .setName("Reset local index state")
       .setDesc("Clears local index tracking. This does not delete remote documents.")
