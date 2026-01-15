@@ -38,6 +38,11 @@ export class RagView extends ItemView {
     return "Obsidian agent";
   }
 
+  // アイコンを取得する
+  getIcon(): string {
+    return "bot";
+  }
+
   // ビューが開かれたときの処理
   async onOpen(): Promise<void> {
     this.render();
