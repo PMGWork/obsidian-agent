@@ -140,7 +140,7 @@ export class GeminiClient {
     throw new Error("Indexing timed out.");
   }
 
-
+  // コンテンツを生成
   async generateContent(
     model: string,
     storeName: string,
@@ -156,6 +156,7 @@ export class GeminiClient {
     })) as GenerateContentResponse;
   }
 
+  // ストリームでコンテンツを生成
   async generateContentStream(
     model: string,
     storeName: string,
@@ -235,6 +236,7 @@ export class GeminiClient {
     }
   }
 
+  // 回答を抽出
   extractAnswer(response: GenerateContentResponse): {
     text: string;
     grounding?: GroundingMetadata;
@@ -261,6 +263,7 @@ export class GeminiClient {
     return { text, grounding, thoughtSummary: thoughtSummary || undefined };
   }
 
+  // 生成リクエストのボディを構築
   private buildGenerateBody({
     model,
     storeName,
@@ -294,6 +297,7 @@ export class GeminiClient {
     });
   }
 
+  // コンテンツを構築
   private buildContents(
     history: ChatEntry[],
     question: string
@@ -309,7 +313,8 @@ export class GeminiClient {
     return contents;
   }
 
-  private async request(url: string, init: { method: string; body?: string }): Promise<unknown> {
+	// HTTPリクエストを実行する
+	private async request(url: string, init: { method: string; body?: string }): Promise<unknown> {
     const params: RequestUrlParam = {
       url,
       method: init.method,
@@ -330,11 +335,13 @@ export class GeminiClient {
     return response.json;
   }
 
-  private async delay(ms: number): Promise<void> {
-    return new Promise((resolve) => window.setTimeout(resolve, ms));
-  }
+	// 指定時間待機する
+	private async delay(ms: number): Promise<void> {
+		return new Promise((resolve) => window.setTimeout(resolve, ms));
+	}
 
-  async generateTitle(question: string): Promise<string> {
+	// 質問からタイトルを生成する
+	async generateTitle(question: string): Promise<string> {
     const model = "models/gemini-2.5-flash-lite";
     const response = await this.request(`${BASE_URL}/${model}:generateContent`, {
       method: "POST",
