@@ -58,6 +58,90 @@ If your plugin does not need CSS, delete this file.
 	height: 16px;
 }
 
+.gemini-rag-dropdown {
+	display: flex;
+	flex-direction: column;
+	gap: 4px;
+	padding: 8px;
+	border-radius: 8px;
+	border: 1px solid var(--background-modifier-border);
+	background: var(--background-primary);
+	box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+	font-size: 13px;
+	max-height: 400px;
+	overflow-y: auto;
+}
+
+.gemini-rag-dropdown-header {
+	padding: 4px 8px;
+	font-weight: 600;
+	font-size: 12px;
+	color: var(--text-muted);
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+}
+
+.gemini-rag-dropdown-empty {
+	padding: 16px;
+	text-align: center;
+	color: var(--text-muted);
+	font-size: 12px;
+}
+
+.gemini-rag-dropdown-list {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.gemini-rag-dropdown-item {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+	padding: 8px;
+	border-radius: 6px;
+	cursor: pointer;
+	transition: background-color 0.15s ease;
+}
+
+.gemini-rag-dropdown-item:hover {
+	background: var(--background-secondary);
+}
+
+.gemini-rag-dropdown-item.is-active {
+	background: var(--interactive-accent);
+	color: var(--text-on-accent);
+}
+
+.gemini-rag-dropdown-item.is-active .gemini-rag-dropdown-item-time {
+	color: var(--text-on-accent);
+	opacity: 0.8;
+}
+
+.gemini-rag-dropdown-item-info {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.gemini-rag-dropdown-item-filename {
+	font-size: 13px;
+	font-weight: 500;
+	word-break: break-all;
+}
+
+.gemini-rag-dropdown-item-meta {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+}
+
+.gemini-rag-dropdown-item-time {
+	font-size: 11px;
+	color: var(--text-muted);
+	opacity: 0.7;
+}
+
 .gemini-rag-main {
 	display: flex;
 	flex-direction: column;

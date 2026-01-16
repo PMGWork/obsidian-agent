@@ -10,6 +10,7 @@ import { resolveVaultPath, openSource } from "../utils/source_navigation";
 import { CitationTooltip } from "./chat_view/citation_tooltip";
 import { formatOutput } from "./chat_view/formatting";
 import { IndexProgressUI } from "./chat_view/index_progress";
+import { HistoryDropdown } from "./history_dropdown";
 
 export const RAG_VIEW_TYPE = "gemini-file-search-rag-view";
 
@@ -21,6 +22,7 @@ export class RagView extends ItemView {
   private tooltip = new CitationTooltip();
   private indexUnsub?: () => void;
   private indexProgress?: IndexProgressUI;
+  private historyDropdown?: HistoryDropdown;
 
   // コンストラクタ
   constructor(leaf: WorkspaceLeaf, plugin: ObsidianRagPlugin) {
@@ -52,6 +54,7 @@ export class RagView extends ItemView {
   async onClose(): Promise<void> {
     this.indexUnsub?.();
     this.tooltip.hide();
+    this.historyDropdown?.dispose();
   }
 
   // UIを描画する
@@ -88,6 +91,8 @@ export class RagView extends ItemView {
     headerButtons.createIndexButton.addEventListener("click", () => {
       void createStoreCommand(this.plugin);
     });
+
+    this.historyDropdown = new HistoryDropdown(headerButtons.historyButton, this.plugin);
 
     headerButtons.newChatButton.addEventListener("click", () => {
       void this.clearChat();
@@ -139,13 +144,19 @@ export class RagView extends ItemView {
     });
     setIcon(indexButton, "refresh-cw");
 
+    const historyButton = headerLeft.createEl("button", {
+      cls: "gemini-rag-icon-btn",
+      attr: { "aria-label": "Chat history", title: "Chat history" },
+    });
+    setIcon(historyButton, "history");
+
     const newChatButton = headerActions.createEl("button", {
       cls: "gemini-rag-icon-btn",
       attr: { "aria-label": "New chat", title: "New chat" },
     });
     setIcon(newChatButton, "plus-circle");
 
-    return { settingsButton, createIndexButton, indexButton, newChatButton };
+    return { settingsButton, createIndexButton, indexButton, historyButton, newChatButton };
   }
 
   // チャット表示領域を描画する
@@ -234,6 +245,11 @@ export class RagView extends ItemView {
   // チャットをクリアする
   async clearChat() {
     this.plugin.history = [];
+    const oldSessionId = this.plugin.currentSessionId;
+    this.plugin.currentSessionId = "";
+    if (oldSessionId) {
+      delete this.plugin.sessions[oldSessionId];
+    }
     await this.plugin.saveSettings();
     this.sourcesMap.clear();
     this.renderHistory();
@@ -328,7 +344,7 @@ export class RagView extends ItemView {
       );
 
       this.scrollToBottom();
-      this.pushHistory(question, finalOutput);
+      await this.pushHistory(question, finalOutput);
 
     } catch (error) {
       console.error(error);
@@ -340,7 +356,9 @@ export class RagView extends ItemView {
 
 
   // 履歴に追加する
-  private pushHistory(question: string, answer: string) {
+  private async pushHistory(question: string, answer: string) {
+    await this.plugin.ensureChatSession();
+
     const entry = {
       id: `${Date.now()}-${Math.random().toString(16).slice(2)}`,
       timestamp: Date.now(),
@@ -353,10 +371,26 @@ export class RagView extends ItemView {
       this.plugin.history = this.plugin.history.slice(-maxItems);
     }
     void this.plugin.saveSettings();
+    void this.plugin.updateChatSession();
+
+    if (this.plugin.history.length === 1) {
+      const apiKey = this.plugin.settings.apiKey;
+      if (apiKey) {
+        const client = new GeminiClient(apiKey);
+        try {
+          const title = await client.generateTitle(question);
+          void this.plugin.updateChatSessionTitle(title);
+        } catch (error) {
+          console.error("Failed to generate title:", error);
+          const fallbackTitle = question.slice(0, 20);
+          void this.plugin.updateChatSessionTitle(fallbackTitle);
+        }
+      }
+    }
   }
 
   // 履歴を描画する
-  private renderHistory() {
+  renderHistory() {
     if (!this.chatEl) return;
     this.chatEl.empty();
     if (!this.plugin.history.length) {
@@ -381,6 +415,7 @@ export class RagView extends ItemView {
     this.scrollToBottom();
   }
 
+  // パスを短縮表示する
   private shortenPath(path: string): string {
     const maxLength = 60;
     if (path.length <= maxLength) {

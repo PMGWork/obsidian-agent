@@ -317,4 +317,30 @@ export class GeminiClient {
   private async delay(ms: number): Promise<void> {
     return new Promise((resolve) => window.setTimeout(resolve, ms));
   }
+
+  async generateTitle(question: string): Promise<string> {
+    const model = "models/gemini-2.5-flash-lite";
+    const response = await this.request(`${BASE_URL}/${model}:generateContent`, {
+      method: "POST",
+      body: JSON.stringify({
+        contents: [
+          {
+            role: "user",
+            parts: [
+              {
+                text: `次の質問を20文字以内で要約しタイトルにしてください:\n${question}`,
+              },
+            ],
+          },
+        ],
+        generationConfig: {
+          temperature: 0.7,
+        },
+      }),
+    });
+
+    const result = response as GenerateContentResponse;
+    const text = result.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
+    return text.trim().slice(0, 20);
+  }
 }

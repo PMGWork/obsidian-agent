@@ -18,3 +18,12 @@ export type ChatEntry = {
   question: string;
   answer: string;
 };
+
+// チャットセッション
+export type ChatSession = {
+  id: string;
+  filename: string;
+  createdAt: number;
+  updatedAt: number;
+  title?: string;
+};

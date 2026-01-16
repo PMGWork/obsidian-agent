@@ -7,6 +7,7 @@ export interface RagSettings {
   model: string;
   storeName: string;
   storeDisplayName: string;
+  chatFolder: string;
 }
 
 // デフォルトの設定
@@ -15,6 +16,7 @@ export const DEFAULT_SETTINGS: RagSettings = {
   model: "gemini-2.5-flash",
   storeName: "",
   storeDisplayName: "obsidian-vault",
+  chatFolder: "agent-chats",
 };
 
 // 設定タブのクラス
@@ -54,8 +56,8 @@ export class RagSettingTab extends PluginSettingTab {
         dropdown
           .addOption("gemini-2.5-flash", "Gemini 2.5 flash")
           .addOption("gemini-2.5-pro", "Gemini 2.5 pro")
-          .addOption("gemini-3-flash-preview", "Gemini 3 flash preview")
-          .addOption("gemini-3-pro-preview", "Gemini 3 pro preview")
+          .addOption("gemini-3-flash-preview", "Gemini 3 flash")
+          .addOption("gemini-3-pro-preview", "Gemini 3 pro")
           .setValue(this.plugin.settings.model)
           .onChange(async (value) => {
             this.plugin.settings.model = value.trim();
@@ -85,6 +87,19 @@ export class RagSettingTab extends PluginSettingTab {
           .setValue(this.plugin.settings.storeDisplayName)
           .onChange(async (value) => {
             this.plugin.settings.storeDisplayName = value.trim();
+            await this.plugin.saveSettings();
+          })
+      );
+
+    // チャット保存フォルダ設定
+    new Setting(containerEl)
+      .setName("Chat folder")
+      .setDesc("Folder where chat sessions will be saved as Markdown files.")
+      .addText((text) =>
+        text
+          .setValue(this.plugin.settings.chatFolder)
+          .onChange(async (value) => {
+            this.plugin.settings.chatFolder = value.trim();
             await this.plugin.saveSettings();
           })
       );
