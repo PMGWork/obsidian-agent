@@ -3,14 +3,17 @@ import ObsidianRagPlugin from "../main";
 import { GeminiClient } from "../services/gemini";
 import { IndexProgressState } from "../services/indexing";
 
+// ファイルの最終更新時刻を取得する
 function getMtime(file: TFile): number {
   return file.stat?.mtime ?? 0;
 }
 
+// インデックス進捗のサマリーを生成する
 function buildSummary(state: IndexProgressState): string {
   return `Indexed ${state.indexed}, skipped ${state.skipped}, failed ${state.failed}.`;
 }
 
+// インデックス進捗のステータスメッセージを生成する
 function buildStatusMessage(state: IndexProgressState): string {
   const summary = `Indexed ${state.indexed}/${state.total} (skipped ${state.skipped}, failed ${state.failed})`;
   switch (state.status) {
@@ -29,6 +32,7 @@ function buildStatusMessage(state: IndexProgressState): string {
   }
 }
 
+// エラーメッセージを取得する
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error && error.message) {
     return error.message;

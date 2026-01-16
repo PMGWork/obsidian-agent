@@ -217,6 +217,22 @@ export class GeminiClient {
         }
       }
     }
+
+    // Process remaining buffer
+    if (buffer.trim()) {
+      const trimmed = buffer.replace(/\r$/, "").trim();
+      if (trimmed.startsWith("data:")) {
+        const jsonText = trimmed.slice(5).trimStart();
+        if (jsonText && jsonText !== "[DONE]") {
+          try {
+            const json = JSON.parse(jsonText) as GenerateContentResponse;
+            await onChunk(json);
+          } catch (e) {
+            console.error("Failed to parse final stream chunk", e);
+          }
+        }
+      }
+    }
   }
 
   extractAnswer(response: GenerateContentResponse): {

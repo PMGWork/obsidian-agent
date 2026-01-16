@@ -32,8 +32,8 @@ export class IndexProgressUI {
     this.cancelButton = progressActions.createEl("button", { cls: "gemini-rag-btn", text: "Cancel" });
   }
 
-  // UIのレンダリング
-  render(state: IndexProgressState) {
+	// UIをレンダリングする
+	render(state: IndexProgressState) {
     const isActive = state.status === "running" || state.status === "cancelling";
     this.root.style.display = isActive ? "flex" : "none";
 

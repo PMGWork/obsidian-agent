@@ -54,7 +54,14 @@ export function annotateAnswer(
 		(grounding as { grounding_supports?: Array<Record<string, unknown>> })
 			.grounding_supports ??
 		[];
+	// Fallback: if supports are empty but sources exist, append all citations at the end
 	if (supports.length === 0) {
+		if (sources.length > 0) {
+			const allCitations = sources
+				.map((s) => `[${s.index}](citation:${s.index})`)
+				.join(" ");
+			return text ? `${text} ${allCitations}` : allCitations;
+		}
 		return text;
 	}
 
@@ -126,6 +133,7 @@ function clampToWordBoundary(text: string, pos: number): number {
 	return pos;
 }
 
+// 文字が単語の一部かどうかを判定する
 function isWordChar(char: string | undefined): boolean {
 	if (!char) {
 		return false;

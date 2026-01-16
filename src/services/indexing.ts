@@ -97,8 +97,8 @@ export class IndexingController {
     this.notify();
   }
 
-  // 
-  markSkipped(): void {
+	// スキップしたファイル数を更新
+	markSkipped(): void {
     this.state = {
       ...this.state,
       skipped: this.state.skipped + 1,
